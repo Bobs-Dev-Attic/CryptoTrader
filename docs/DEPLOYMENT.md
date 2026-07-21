@@ -84,19 +84,19 @@ After it redeploys:
 
 ## 4. Scheduling the agent tick
 
-Running agents are evaluated by calling `POST|GET /api/internal/tick`, guarded by
-`INTERNAL_CRON_SECRET`. Two options:
+Running agents are evaluated by calling `GET|POST /api/internal/tick`, guarded by
+`INTERNAL_CRON_SECRET`.
 
-### Option A — Vercel Cron (already configured)
-The root `vercel.json` declares a cron on `/api/internal/tick` every minute.
-Vercel automatically sends `Authorization: Bearer $CRON_SECRET`, which the
-endpoint verifies.
+> **Why not Vercel Cron?** Vercel's **Hobby** plan only allows **once-per-day**
+> cron jobs — an every-minute cron makes the deploy fail. So the root
+> `vercel.json` ships **without** a cron; use Supabase pg_cron below (works on any
+> plan and gives minute-level ticks). If you're on Vercel **Pro**, you can instead
+> add `"crons": [{ "path": "/api/internal/tick", "schedule": "* * * * *" }]` back
+> to `vercel.json`.
 
-> ⚠️ **Plan limits:** Vercel's **Hobby** plan runs cron jobs at most **once per
-> day**. For minute-level evaluation you need the **Pro** plan, or use Option B.
-
-### Option B — Supabase pg_cron (minute-level on any plan)
-In the Supabase SQL editor:
+### Supabase pg_cron (recommended, minute-level on any plan)
+In the Supabase SQL editor for the **cryptotrader** project, replacing the URL
+with your deployment and the secret with your `INTERNAL_CRON_SECRET`:
 
 ```sql
 create extension if not exists pg_cron;
@@ -107,7 +107,7 @@ select cron.schedule(
   '* * * * *',
   $$
   select net.http_post(
-    url     := 'https://<api>.vercel.app/api/internal/tick',
+    url     := 'https://crypto-trader-alpha-lime.vercel.app/api/internal/tick',
     headers := jsonb_build_object('x-cron-secret', '<INTERNAL_CRON_SECRET>')
   );
   $$
@@ -116,9 +116,10 @@ select cron.schedule(
 
 ## 5. Auto-deploy on every update
 
-Once both projects are imported from GitHub, **every push/merge to `main`
-triggers a fresh production deploy of each** — no further action needed. Feature
-branches get preview deployments automatically.
+Once the project is imported from GitHub, **every push/merge to `main` triggers a
+fresh production deploy** — no further action needed. Feature branches get
+preview deployments automatically. (If a push is ever missed, use **Redeploy** in
+the dashboard.)
 
 ---
 
