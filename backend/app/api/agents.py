@@ -160,7 +160,9 @@ def delete_agent(
     agent_id: int,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> None:
+):
+    # No `-> None` return annotation: some FastAPI versions treat it as a
+    # NoneType response body and reject it on a 204 (no-body) status.
     agent = _owned_agent(db, user, agent_id)
     db.delete(agent)
     db.commit()

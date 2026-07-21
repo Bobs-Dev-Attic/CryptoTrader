@@ -62,6 +62,37 @@ def test_live_agent_requires_account(client, auth_headers):
     assert "account" in resp.json()["detail"].lower()
 
 
+def test_delete_endpoints_return_204(client, auth_headers):
+    # Create then delete an account -> 204 (no body).
+    acc = client.post(
+        "/api/accounts",
+        json={"exchange": "kraken", "label": "temp"},
+        headers=auth_headers,
+    )
+    assert acc.status_code == 201
+    acc_id = acc.json()["id"]
+    resp = client.delete(f"/api/accounts/{acc_id}", headers=auth_headers)
+    assert resp.status_code == 204
+    assert resp.content == b""
+
+    # Create then delete an agent -> 204 (no body).
+    ag = client.post(
+        "/api/agents",
+        json={
+            "name": "temp",
+            "exchange": "kraken",
+            "symbol": "BTC/USD",
+            "strategy_type": "rule_based",
+            "trade_mode": "paper",
+        },
+        headers=auth_headers,
+    )
+    assert ag.status_code == 201
+    resp = client.delete(f"/api/agents/{ag.json()['id']}", headers=auth_headers)
+    assert resp.status_code == 204
+    assert resp.content == b""
+
+
 def test_account_secrets_not_exposed(client, auth_headers):
     payload = {
         "exchange": "coinbase",
