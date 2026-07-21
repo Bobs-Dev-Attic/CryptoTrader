@@ -1,0 +1,17 @@
+# Runtime dependencies for the Vercel Python function (api/index.py).
+# Mirrors backend/requirements.txt minus dev/test packages. Keep in sync.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+sqlalchemy==2.0.36
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.1
+python-multipart==0.0.20
+email-validator==2.2.0
+cryptography==44.0.0
+ccxt==4.4.50
+APScheduler==3.11.0
+psycopg2-binary==2.9.10
+anthropic==0.42.0
+httpx==0.28.1

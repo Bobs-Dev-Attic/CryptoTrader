@@ -5,11 +5,25 @@ import Constants from "expo-constants";
 const TOKEN_KEY = "cryptotrader.token";
 
 export function getBaseUrl(): string {
-  const fromExtra = (Constants.expoConfig?.extra as any)?.apiBaseUrl;
-  // Allow override via env for web builds.
+  // 1) Explicit override always wins (useful for native builds / custom hosts).
   const fromEnv =
     typeof process !== "undefined" ? process.env?.EXPO_PUBLIC_API_URL : undefined;
-  return fromEnv || fromExtra || "http://localhost:8000";
+  if (fromEnv) return fromEnv;
+
+  // 2) On the deployed web app the API is served from the SAME origin under
+  //    /api/* (single-project Vercel deployment), so no configuration is needed.
+  if (
+    typeof window !== "undefined" &&
+    window.location?.origin &&
+    !window.location.origin.includes("localhost") &&
+    !window.location.origin.includes("127.0.0.1")
+  ) {
+    return window.location.origin;
+  }
+
+  // 3) Local development fallback (Expo web on :8081 -> API on :8000).
+  const fromExtra = (Constants.expoConfig?.extra as any)?.apiBaseUrl;
+  return fromExtra || "http://localhost:8000";
 }
 
 export async function getToken(): Promise<string | null> {

@@ -86,9 +86,11 @@ fetch candles → compute indicators → strategy decides (BUY/SELL/HOLD)
 
 ## Deployment
 
-Deploys as two Vercel projects (Python serverless API + Expo web) backed by
-Supabase Postgres, with git auto-deploy on every push to `main`. See
-[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the step-by-step setup.
+Deploys as a **single Vercel project** (repo root) that serves the Expo web app
+and the FastAPI backend at `/api/*` from one origin, backed by Supabase Postgres,
+with git auto-deploy on every push to `main`. No second project, no API-URL or
+CORS config. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the one remaining
+step (environment variables).
 
 ## Tech stack
 
