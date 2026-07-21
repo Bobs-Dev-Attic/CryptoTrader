@@ -1,5 +1,5 @@
 /** Small reusable UI primitives shared across screens. */
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -12,6 +12,44 @@ import {
 } from "react-native";
 
 import { colors, radius, spacing } from "./theme";
+
+/**
+ * A field label with an optional tap-to-reveal help hint (ⓘ). Works on web and
+ * mobile (hover tooltips don't exist on touch devices), so tapping the icon
+ * toggles an inline explanation beneath the label.
+ */
+export function InfoLabel({ label, help }: { label: string; help?: string }) {
+  const [open, setOpen] = useState(false);
+  if (!help) {
+    return <Text style={styles.label}>{label}</Text>;
+  }
+  return (
+    <View style={{ marginBottom: spacing.xs }}>
+      <Pressable
+        onPress={() => setOpen((o) => !o)}
+        hitSlop={8}
+        style={{ flexDirection: "row", alignItems: "center" }}
+        accessibilityRole="button"
+        accessibilityLabel={`${label} — tap for help`}
+      >
+        <Text style={styles.label}>{label}</Text>
+        <View style={styles.infoBadge}>
+          <Text style={styles.infoBadgeText}>{open ? "×" : "i"}</Text>
+        </View>
+      </Pressable>
+      {open && <Text style={styles.helpText}>{help}</Text>}
+    </View>
+  );
+}
+
+/** A standalone explanatory paragraph (e.g. a section intro for lay users). */
+export function HelpNote({ children }: { children: React.ReactNode }) {
+  return (
+    <View style={styles.helpNote}>
+      <Text style={styles.helpNoteText}>{children}</Text>
+    </View>
+  );
+}
 
 export function Card({
   children,
@@ -62,11 +100,12 @@ export function Button({
 
 export function Field({
   label,
+  help,
   ...props
-}: { label: string } & TextInputProps) {
+}: { label: string; help?: string } & TextInputProps) {
   return (
     <View style={{ marginBottom: spacing.md }}>
-      <Text style={styles.label}>{label}</Text>
+      <InfoLabel label={label} help={help} />
       <TextInput
         placeholderTextColor={colors.textDim}
         style={styles.input}
@@ -123,7 +162,39 @@ export const styles = StyleSheet.create({
     minHeight: 46,
   },
   buttonText: { color: "#fff", fontWeight: "600", fontSize: 15 },
-  label: { color: colors.textDim, fontSize: 13, marginBottom: spacing.xs },
+  label: { color: colors.textDim, fontSize: 13 },
+  infoBadge: {
+    marginLeft: 6,
+    width: 15,
+    height: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  infoBadgeText: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "700",
+    lineHeight: 12,
+  },
+  helpText: {
+    color: colors.textDim,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: spacing.xs,
+    paddingLeft: 2,
+  },
+  helpNote: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  helpNoteText: { color: colors.text, fontSize: 13, lineHeight: 19 },
   input: {
     backgroundColor: colors.surfaceAlt,
     borderRadius: radius.sm,

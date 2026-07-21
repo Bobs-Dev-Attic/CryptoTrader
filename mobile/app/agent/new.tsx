@@ -3,25 +3,30 @@ import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, Switch, Text, View } from "react-native";
 
 import { api, ExchangeAccount, ExchangeMeta, StrategyMeta } from "@/api";
-import { Button, Card, Field } from "@/components";
+import { Button, Card, Field, HelpNote, InfoLabel } from "@/components";
 import { colors, radius, spacing } from "@/theme";
 
-/** A pill-style single-select control. */
+type PillOption<T> = { value: T; label: string; help?: string };
+
+/** A pill-style single-select control. Shows the selected option's help below. */
 function Pills<T extends string>({
   label,
+  help,
   value,
   options,
   onChange,
 }: {
   label: string;
+  help?: string;
   value: T;
-  options: { value: T; label: string }[];
+  options: PillOption<T>[];
   onChange: (v: T) => void;
 }) {
+  const selected = options.find((o) => o.value === value);
   return (
     <View style={{ marginBottom: spacing.md }}>
-      <Text style={{ color: colors.textDim, fontSize: 13, marginBottom: spacing.xs }}>{label}</Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
+      <InfoLabel label={label} help={help} />
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs }}>
         {options.map((o) => (
           <Pressable
             key={o.value}
@@ -39,18 +44,79 @@ function Pills<T extends string>({
           </Pressable>
         ))}
       </View>
+      {selected?.help ? (
+        <Text style={{ color: colors.textDim, fontSize: 12, lineHeight: 17, marginTop: spacing.xs }}>
+          {selected.help}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
-function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+  label,
+  help,
+  value,
+  onChange,
+}: {
+  label: string;
+  help?: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}) {
   return (
-    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.sm }}>
-      <Text style={{ color: colors.text }}>{label}</Text>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.primary }} />
+    <View style={{ marginBottom: spacing.sm }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <View style={{ flex: 1, paddingRight: spacing.md }}>
+          <InfoLabel label={label} help={help} />
+        </View>
+        <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.primary }} />
+      </View>
     </View>
   );
 }
+
+/** Plain-language help strings for the New Agent form. */
+const HELP = {
+  name: "A label for you to recognize this agent — e.g. 'BTC swing bot'. It has no effect on trading.",
+  exchange:
+    "The crypto marketplace this agent watches for prices. In live mode, real orders are placed here (Robinhood is paper-only in this build).",
+  symbol:
+    "The trading pair to trade. 'BTC/USD' means Bitcoin priced in US dollars; 'ETH/USDT' means Ethereum priced in the USDT stablecoin. The part after the slash is the 'quote' currency you spend.",
+  timeframe:
+    "How much time each price bar (candle) covers. Shorter bars (15m) react faster but are noisier; longer bars (1d) are slower but steadier.",
+  strategy:
+    "The logic the agent uses to decide when to buy or sell. Choose one below — tap ⓘ on each option to learn more.",
+  strategyRule:
+    "Uses classic math indicators on the price chart to make decisions. Predictable, free, and needs no AI. A good place to start.",
+  strategyLlm:
+    "Uses Claude AI to weigh the market like a human analyst would. More flexible and can follow plain-English guidance, but needs an AI key and each decision costs a little.",
+  rsi:
+    "RSI (Relative Strength Index) measures whether a coin has recently jumped a lot ('overbought') or dropped a lot ('oversold'). This rule leans buy when oversold and sell when overbought — betting the price snaps back.",
+  macd:
+    "MACD spots shifts in momentum. It leans buy when momentum turns upward and sell when it turns downward.",
+  maCross:
+    "Compares a fast and a slow moving average (the average price over N recent candles). Buy when the fast average crosses above the slow one (an uptrend forming) and sell when it crosses below.",
+  maFast:
+    "How many candles the FAST moving average covers. Smaller reacts quicker to price changes. Typical: 20. Must be smaller than the slow value.",
+  maSlow:
+    "How many candles the SLOW moving average covers. Larger is steadier and filters out noise. Typical: 50.",
+  guidance:
+    "Optional plain-English instructions for the AI, e.g. 'be cautious when the market is volatile' or 'favor long-term trends over quick moves'. Leave blank for a balanced default.",
+  tradeMode:
+    "Whether trades are simulated or real. Start with Paper until you trust the agent.",
+  paper:
+    "Simulated trading with pretend money and real live prices. Nothing real is bought or sold — the safe way to test a strategy.",
+  live:
+    "Places REAL orders with REAL money using your linked exchange API keys. Only use once you've tested in paper mode and understand the risk.",
+  account: "Which of your linked exchange keys this agent trades with in live mode.",
+  orderSize:
+    "How much to spend on each BUY, in the quote currency (the part after the slash in the symbol). E.g. 100 on BTC/USD means $100 per buy.",
+  interval:
+    "How often the agent checks the market and may trade, in seconds. 300 = every 5 minutes. Minimum is 30 seconds.",
+  paperBalance:
+    "The starting pretend cash for this paper agent, in the quote currency. Its profit/loss is measured against this.",
+};
 
 export default function NewAgent() {
   const router = useRouter();
@@ -134,17 +200,33 @@ export default function NewAgent() {
 
   return (
     <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
+      <HelpNote>
+        An <Text style={{ fontWeight: "700" }}>agent</Text> is an automated bot that watches one market
+        and follows a strategy you choose to decide when to buy and sell. New agents trade in{" "}
+        <Text style={{ fontWeight: "700" }}>paper (simulated) mode</Text> by default, so you can try
+        ideas with zero risk. Tap the ⓘ next to any option for a plain-language explanation.
+      </HelpNote>
+
       <Card>
-        <Field label="Name" value={name} onChangeText={setName} />
+        <Field label="Name" value={name} onChangeText={setName} help={HELP.name} />
         <Pills
           label="Exchange"
+          help={HELP.exchange}
           value={exchange}
           onChange={setExchange}
           options={exchanges.map((e) => ({ value: e.id, label: e.name }))}
         />
-        <Field label="Symbol" value={symbol} onChangeText={setSymbol} autoCapitalize="characters" placeholder="BTC/USD" />
+        <Field
+          label="Symbol"
+          value={symbol}
+          onChangeText={setSymbol}
+          autoCapitalize="characters"
+          placeholder="BTC/USD"
+          help={HELP.symbol}
+        />
         <Pills
           label="Timeframe"
+          help={HELP.timeframe}
           value={timeframe}
           onChange={setTimeframe}
           options={[
@@ -159,45 +241,76 @@ export default function NewAgent() {
       <Card>
         <Pills
           label="Strategy"
+          help={HELP.strategy}
           value={strategyType}
           onChange={setStrategyType}
-          options={strategies.map((s) => ({ value: s.type as any, label: s.name }))}
+          options={strategies.map((s) => ({
+            value: s.type as any,
+            label: s.name,
+            help: s.type === "llm" ? HELP.strategyLlm : HELP.strategyRule,
+          }))}
         />
         {strategyType === "rule_based" ? (
           <View>
-            <Toggle label="RSI mean-reversion" value={useRsi} onChange={setUseRsi} />
-            <Toggle label="MACD crossover" value={useMacd} onChange={setUseMacd} />
-            <Toggle label="MA crossover" value={useMaCross} onChange={setUseMaCross} />
+            <HelpNote>
+              This strategy runs the indicators you switch on below. Each one casts a buy/sell vote on
+              every check, and the majority decides the action — so turning on more indicators means an
+              agent that only acts when they agree. All three are on by default.
+            </HelpNote>
+            <Toggle label="RSI mean-reversion" help={HELP.rsi} value={useRsi} onChange={setUseRsi} />
+            <Toggle label="MACD crossover" help={HELP.macd} value={useMacd} onChange={setUseMacd} />
+            <Toggle label="MA crossover" help={HELP.maCross} value={useMaCross} onChange={setUseMaCross} />
             {useMaCross && (
-              <View style={{ flexDirection: "row", gap: spacing.md }}>
+              <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.sm }}>
                 <View style={{ flex: 1 }}>
-                  <Field label="Fast MA" value={maFast} onChangeText={setMaFast} keyboardType="numeric" />
+                  <Field
+                    label="Fast MA"
+                    value={maFast}
+                    onChangeText={setMaFast}
+                    keyboardType="numeric"
+                    help={HELP.maFast}
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Field label="Slow MA" value={maSlow} onChangeText={setMaSlow} keyboardType="numeric" />
+                  <Field
+                    label="Slow MA"
+                    value={maSlow}
+                    onChangeText={setMaSlow}
+                    keyboardType="numeric"
+                    help={HELP.maSlow}
+                  />
                 </View>
               </View>
             )}
           </View>
         ) : (
-          <Field
-            label="LLM guidance (optional)"
-            value={guidance}
-            onChangeText={setGuidance}
-            placeholder="e.g. Be conservative; avoid trading in high volatility."
-            multiline
-          />
+          <View>
+            <HelpNote>
+              Claude reads a snapshot of the market (recent prices and indicators) plus your guidance,
+              then returns a buy / sell / hold decision with its reasoning. Needs an AI key configured on
+              the server; without one, the agent simply holds.
+            </HelpNote>
+            <Field
+              label="LLM guidance (optional)"
+              value={guidance}
+              onChangeText={setGuidance}
+              placeholder="e.g. Be conservative; avoid trading in high volatility."
+              multiline
+              help={HELP.guidance}
+            />
+          </View>
         )}
       </Card>
 
       <Card>
         <Pills
           label="Trade mode"
+          help={HELP.tradeMode}
           value={tradeMode}
           onChange={setTradeMode}
           options={[
-            { value: "paper", label: "Paper (simulated)" },
-            { value: "live", label: "Live (real money)" },
+            { value: "paper", label: "Paper (simulated)", help: HELP.paper },
+            { value: "live", label: "Live (real money)", help: HELP.live },
           ]}
         />
         {tradeMode === "live" && (
@@ -207,6 +320,7 @@ export default function NewAgent() {
             </Text>
             <Pills
               label="Account"
+              help={HELP.account}
               value={accountId ? String(accountId) : ""}
               onChange={(v) => setAccountId(Number(v))}
               options={matchingAccounts.map((a) => ({ value: String(a.id), label: a.label }))}
@@ -220,14 +334,32 @@ export default function NewAgent() {
         )}
         <View style={{ flexDirection: "row", gap: spacing.md }}>
           <View style={{ flex: 1 }}>
-            <Field label="Order size (quote)" value={orderSize} onChangeText={setOrderSize} keyboardType="numeric" />
+            <Field
+              label="Order size (quote)"
+              value={orderSize}
+              onChangeText={setOrderSize}
+              keyboardType="numeric"
+              help={HELP.orderSize}
+            />
           </View>
           <View style={{ flex: 1 }}>
-            <Field label="Interval (sec)" value={interval} onChangeText={setIntervalSec} keyboardType="numeric" />
+            <Field
+              label="Interval (sec)"
+              value={interval}
+              onChangeText={setIntervalSec}
+              keyboardType="numeric"
+              help={HELP.interval}
+            />
           </View>
         </View>
         {tradeMode === "paper" && (
-          <Field label="Paper balance (quote)" value={paperBalance} onChangeText={setPaperBalance} keyboardType="numeric" />
+          <Field
+            label="Paper balance (quote)"
+            value={paperBalance}
+            onChangeText={setPaperBalance}
+            keyboardType="numeric"
+            help={HELP.paperBalance}
+          />
         )}
       </Card>
 
