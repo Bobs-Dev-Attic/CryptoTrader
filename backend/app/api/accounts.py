@@ -100,7 +100,9 @@ def delete_account(
     account_id: int,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> None:
+):
+    # No `-> None` return annotation: some FastAPI versions treat it as a
+    # NoneType response body and reject it on a 204 (no-body) status.
     acc = db.get(ExchangeAccount, account_id)
     if not acc or acc.user_id != user.id:
         raise HTTPException(status_code=404, detail="Account not found")
