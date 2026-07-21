@@ -1,94 +1,83 @@
 # Deployment (Vercel + Supabase, git auto-deploy)
 
-This project deploys as **two Vercel projects from the same repo** — the FastAPI
-backend (Python serverless) and the Expo web app — backed by a **Supabase
-Postgres** database. Once linked, every push to `main` auto-deploys both.
+This project deploys as a **single Vercel project from the repo root**, backed by
+a **Supabase Postgres** database. The one project serves the Expo web app as
+static files **and** the FastAPI backend at `/api/*` (same origin), so there's no
+second project, no `EXPO_PUBLIC_API_URL`, and no CORS to configure. Every push to
+`main` auto-deploys.
 
 ```
 GitHub (main)
-   ├── Vercel project "cryptotrader-api"   ── rootDir: backend/  ── Python serverless + Cron
-   │        └── DATABASE_URL ─────────────────► Supabase Postgres
-   └── Vercel project "cryptotrader-web"   ── rootDir: mobile/   ── Expo web static
-            └── EXPO_PUBLIC_API_URL ──────────► the API project's URL
+   └── ONE Vercel project (repo root)
+         ├── web:  cd mobile && expo export  →  mobile/dist   (static, served at /)
+         └── api:  api/index.py (ASGI)        →  /api/*        (Python serverless + Cron)
+                        └── DATABASE_URL ───────────────────► Supabase Postgres
 ```
+
+How it fits together (all already in the repo):
+- Root `vercel.json` builds the web app, routes `/api/*` to the Python function,
+  everything else to the SPA, and declares the cron.
+- `api/index.py` is the ASGI entrypoint; it bundles `backend/**` (via
+  `functions.includeFiles`) and serves the FastAPI app.
+- The web client calls the API at its **own origin** under `/api/*`
+  (`getBaseUrl()` in `mobile/src/api.ts`), so no API URL needs configuring.
 
 ---
 
-## 1. Provision the database (Supabase)
+## 1. Database (Supabase) — already provisioned
 
-A project named **`cryptotrader`** has already been provisioned (region
-`us-east-1`, ref `wjqbouylzsijrlkynfsa`), the schema is applied, and Row Level
-Security is enabled on every table. You only need the **connection string**:
+A project named **`cryptotrader`** is provisioned (region `us-east-1`, ref
+`wjqbouylzsijrlkynfsa`), the schema is applied, and Row Level Security is enabled
+on every table. You only need its **connection string**:
 
 1. Supabase dashboard → project **cryptotrader** → **Connect** (top bar).
-2. Choose **Connection string → URI**, and pick the **Transaction pooler**
-   (the IPv4 "Shared Pooler" — required because Vercel functions are IPv4-only
-   and the direct `db.<ref>.supabase.co` host is IPv6-only).
+2. **Connection string → URI**, and pick the **Transaction pooler** (the IPv4
+   "Shared Pooler" — required because Vercel functions are IPv4-only and the
+   direct `db.<ref>.supabase.co` host is IPv6-only).
 3. If it shows `[YOUR-PASSWORD]`, reset it under **Settings → Database → Reset
    database password** and paste the new password in.
 
-The result looks like:
+Result (this is your `DATABASE_URL`):
 
 ```
 postgresql://postgres.wjqbouylzsijrlkynfsa:<password>@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require
 ```
 
-That value is the backend's `DATABASE_URL`.
-
 > **Why it's already secure:** the backend connects as the `postgres` role, which
-> owns the tables and therefore bypasses RLS — while the enabled RLS blocks the
-> anon Supabase REST API from touching your data. The schema is pre-created, so
-> no migration runs on first boot.
+> owns the tables and bypasses RLS — while the enabled RLS blocks the anon
+> Supabase REST API. The schema is pre-created, so no migration runs on boot.
 
-## 2. Deploy the backend (Vercel project #1)
+## 2. Configure the single Vercel project
 
-1. In Vercel: **Add New → Project → import the GitHub repo**.
-2. Set **Root Directory** to `backend`.
-3. Framework preset: **Other** (the included `backend/vercel.json` handles routing
-   — all paths rewrite to the ASGI function in `backend/api/index.py`).
-4. Add **Environment Variables**:
+The repo is already imported as the **`crypto-trader`** project (repo-root). All
+that's left is adding environment variables:
 
-   | Name | Value |
-   | --- | --- |
-   | `DATABASE_URL` | the Supabase URI from step 1 |
-   | `JWT_SECRET` | a long random string |
-   | `ENCRYPTION_KEY` | `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
-   | `INTERNAL_CRON_SECRET` | a long random string (see step 4) |
-   | `CRON_SECRET` | **same value** as `INTERNAL_CRON_SECRET` (Vercel Cron sends this as a Bearer token) |
-   | `ANTHROPIC_API_KEY` | optional — enables LLM agents |
-   | `CORS_ORIGINS` | the web app's URL (set after step 3), or `*` while testing |
+**Settings → Environment Variables** (Production), then **Redeploy**:
 
-5. Deploy. Verify `https://<api>.vercel.app/health` returns `{"status":"ok"}`.
+| Name | Value |
+| --- | --- |
+| `DATABASE_URL` | the Supabase URI from step 1 |
+| `JWT_SECRET` | a long random string |
+| `ENCRYPTION_KEY` | a Fernet key: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+| `INTERNAL_CRON_SECRET` | a long random string |
+| `CRON_SECRET` | **same value** as `INTERNAL_CRON_SECRET` (Vercel Cron sends it as a Bearer token) |
+| `ANTHROPIC_API_KEY` | optional — enables LLM agents |
 
-## 3. Deploy the web app (Vercel project #2)
+After it redeploys:
+- `https://<your-app>.vercel.app/health` → `{"status":"ok"}`
+- `https://<your-app>.vercel.app/` → the app; register and create a paper agent.
 
-The **repo root** is configured to build the web app (root `vercel.json` runs
-`expo export` from `mobile/`), so a project imported with the **default root
-directory works out of the box** — no Root Directory change needed for the web
-app. (Alternatively, set **Root Directory** to `mobile`, which uses
-`mobile/vercel.json` instead; either works.)
+> No `EXPO_PUBLIC_API_URL` and no `CORS_ORIGINS` are needed — the web app and API
+> share one origin. (`CORS_ORIGINS` defaults to `*`, which is harmless since the
+> app uses Bearer tokens, not cookies.)
 
-1. **Add New → Project → import the same repo** (leave Root Directory as `/`).
-2. Add **Environment Variable**:
-
-   | Name | Value |
-   | --- | --- |
-   | `EXPO_PUBLIC_API_URL` | the backend URL from step 2, e.g. `https://cryptotrader-api.vercel.app` |
-
-3. Deploy. Open the URL, register, and create a paper agent.
-
-> **Important:** because the repo root builds the *web app*, the **backend**
-> project (step 2) **must** have its Root Directory set to `backend` — otherwise
-> it will build the web app too.
-
-### Troubleshooting: URL shows 404 / "build completed in ~100ms"
-
-That means Vercel built the empty repo root without the root `vercel.json` (e.g.
-the project was imported before this file existed). Fix: push to `main` (or hit
-**Redeploy**) so the build picks up the root `vercel.json`, then set
-`EXPO_PUBLIC_API_URL` and redeploy.
-6. Go back to the API project and set `CORS_ORIGINS` to this web URL, then redeploy
-   the API (or leave `*` for now).
+### Troubleshooting
+- **404 at `/`** → the deployment built the empty repo root without the root
+  `vercel.json`. Push to `main` / hit **Redeploy** so the build picks it up.
+- **`/api/...` returns 500** → check **Runtime Logs**; almost always a missing or
+  wrong `DATABASE_URL` (must be the **pooler** URI, not `db.<ref>.supabase.co`).
+- **Login shows "Can't reach the API … localhost"** → you're on an old web build;
+  redeploy so the same-origin default takes effect.
 
 ## 4. Scheduling the agent tick
 
@@ -96,9 +85,9 @@ Running agents are evaluated by calling `POST|GET /api/internal/tick`, guarded b
 `INTERNAL_CRON_SECRET`. Two options:
 
 ### Option A — Vercel Cron (already configured)
-`backend/vercel.json` declares a cron on `/api/internal/tick` every minute. Vercel
-automatically sends `Authorization: Bearer $CRON_SECRET`, which the endpoint
-verifies.
+The root `vercel.json` declares a cron on `/api/internal/tick` every minute.
+Vercel automatically sends `Authorization: Bearer $CRON_SECRET`, which the
+endpoint verifies.
 
 > ⚠️ **Plan limits:** Vercel's **Hobby** plan runs cron jobs at most **once per
 > day**. For minute-level evaluation you need the **Pro** plan, or use Option B.
