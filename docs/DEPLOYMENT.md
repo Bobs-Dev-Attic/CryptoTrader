@@ -46,17 +46,31 @@ GitHub (main)
 
 ## 3. Deploy the web app (Vercel project #2)
 
-1. **Add New → Project → import the same repo** again.
-2. Set **Root Directory** to `mobile`.
-3. The included `mobile/vercel.json` builds it with `expo export --platform web`
-   (output `dist`, SPA rewrites).
-4. Add **Environment Variable**:
+The **repo root** is configured to build the web app (root `vercel.json` runs
+`expo export` from `mobile/`), so a project imported with the **default root
+directory works out of the box** — no Root Directory change needed for the web
+app. (Alternatively, set **Root Directory** to `mobile`, which uses
+`mobile/vercel.json` instead; either works.)
+
+1. **Add New → Project → import the same repo** (leave Root Directory as `/`).
+2. Add **Environment Variable**:
 
    | Name | Value |
    | --- | --- |
    | `EXPO_PUBLIC_API_URL` | the backend URL from step 2, e.g. `https://cryptotrader-api.vercel.app` |
 
-5. Deploy. Open the URL, register, and create a paper agent.
+3. Deploy. Open the URL, register, and create a paper agent.
+
+> **Important:** because the repo root builds the *web app*, the **backend**
+> project (step 2) **must** have its Root Directory set to `backend` — otherwise
+> it will build the web app too.
+
+### Troubleshooting: URL shows 404 / "build completed in ~100ms"
+
+That means Vercel built the empty repo root without the root `vercel.json` (e.g.
+the project was imported before this file existed). Fix: push to `main` (or hit
+**Redeploy**) so the build picks up the root `vercel.json`, then set
+`EXPO_PUBLIC_API_URL` and redeploy.
 6. Go back to the API project and set `CORS_ORIGINS` to this web URL, then redeploy
    the API (or leave `*` for now).
 
