@@ -241,6 +241,13 @@ export const api = {
     request<void>(`/api/accounts/${id}`, { method: "DELETE" }),
 
   exchanges: () => request<ExchangeMeta[]>("/api/market/exchanges", {}, false),
+  portfolioHistory: () => request<{ t: string; equity: number }[]>("/api/portfolio/history"),
+  portfolioAllocation: () =>
+    request<{ label: string; value: number; symbol: string }[]>("/api/portfolio/allocation"),
+  portfolioStats: () => request<Record<string, number>>("/api/portfolio/stats"),
+  agentEquity: (id: number) =>
+    request<{ t: string; equity: number }[]>(`/api/agents/${id}/equity`),
+
   tickers: (exchange: string, symbols: string[]) =>
     request<TickerQuote[]>(
       `/api/market/tickers?exchange=${encodeURIComponent(exchange)}&symbols=${encodeURIComponent(

@@ -164,6 +164,22 @@ class Signal(Base):
     agent: Mapped["Agent"] = relationship(back_populates="signals")
 
 
+class EquitySnapshot(Base):
+    """Point-in-time equity for an agent, recorded on each evaluation tick.
+
+    Powers the equity curve. Equity = cash + position marked to current price.
+    """
+
+    __tablename__ = "equity_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), index=True)
+    equity: Mapped[float] = mapped_column(Float)
+    realized_pnl: Mapped[float] = mapped_column(Float, default=0.0)
+    price: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, index=True)
+
+
 class Trade(Base):
     """An executed (or attempted) order, paper or live."""
 

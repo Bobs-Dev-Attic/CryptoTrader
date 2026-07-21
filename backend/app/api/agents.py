@@ -10,7 +10,7 @@ from ..database import get_db
 from ..deps import get_current_user
 from ..enums import AgentStatus, ExchangeId, TradeMode
 from ..exchanges import get_adapter
-from ..models import Agent, ExchangeAccount, Signal, Trade, User
+from ..models import Agent, EquitySnapshot, ExchangeAccount, Signal, Trade, User
 from ..schemas import (
     AgentCreate,
     AgentDetail,
@@ -195,6 +195,23 @@ def stop_agent(
     db.commit()
     db.refresh(agent)
     return agent
+
+
+@router.get("/{agent_id}/equity")
+def agent_equity(
+    agent_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """This agent's equity curve (oldest first)."""
+    agent = _owned_agent(db, user, agent_id)
+    snaps = (
+        db.query(EquitySnapshot)
+        .filter(EquitySnapshot.agent_id == agent.id)
+        .order_by(EquitySnapshot.created_at.asc())
+        .all()
+    )
+    return [{"t": s.created_at.isoformat(), "equity": round(s.equity, 2)} for s in snaps]
 
 
 @router.post("/{agent_id}/run", response_model=SignalOut)

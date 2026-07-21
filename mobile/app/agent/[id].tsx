@@ -8,6 +8,7 @@ import React, { useCallback, useState } from "react";
 import { Alert, Platform, RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { AgentDetail, api } from "@/api";
+import { LineChart } from "@/charts";
 import { Badge, Button, Card } from "@/components";
 import { colors, pnlColor, spacing } from "@/theme";
 
@@ -29,13 +30,19 @@ export default function AgentDetailScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const [agent, setAgent] = useState<AgentDetail | null>(null);
+  const [equity, setEquity] = useState<{ t: string; equity: number }[]>([]);
+  const [chartW, setChartW] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const a = await api.getAgent(agentId);
+      const [a, eq] = await Promise.all([
+        api.getAgent(agentId),
+        api.agentEquity(agentId).catch(() => []),
+      ]);
       setAgent(a);
+      setEquity(eq);
       navigation.setOptions({ title: a.name });
     } catch {
       /* ignore */
@@ -119,6 +126,15 @@ export default function AgentDetailScreen() {
         {agent.equity != null && <Line label="Equity" value={`$${agent.equity.toFixed(2)}`} />}
       </Card>
 
+      {equity.length >= 2 && (
+        <Card>
+          <Text style={{ color: colors.text, fontWeight: "700", marginBottom: spacing.sm }}>Equity curve</Text>
+          <View onLayout={(e) => setChartW(e.nativeEvent.layout.width)}>
+            <LineChart values={equity.map((p) => p.equity)} width={chartW} height={120} />
+          </View>
+        </Card>
+      )}
+
       {/* Controls */}
       <Card>
         <View style={{ flexDirection: "row", gap: spacing.md }}>
@@ -182,6 +198,22 @@ export default function AgentDetailScreen() {
       <Text style={{ color: colors.text, fontSize: 18, fontWeight: "700", marginVertical: spacing.md }}>
         Recent signals
       </Text>
+      {agent.recent_signals.length > 0 && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginBottom: spacing.md }}>
+          {[...agent.recent_signals].reverse().map((s) => (
+            <View
+              key={`hs-${s.id}`}
+              style={{
+                width: 14,
+                height: 14,
+                borderRadius: 3,
+                backgroundColor:
+                  s.action === "buy" ? colors.green : s.action === "sell" ? colors.red : colors.surfaceAlt,
+              }}
+            />
+          ))}
+        </View>
+      )}
       {agent.recent_signals.length === 0 ? (
         <Text style={{ color: colors.textDim }}>No evaluations yet. Try “Run once”.</Text>
       ) : (

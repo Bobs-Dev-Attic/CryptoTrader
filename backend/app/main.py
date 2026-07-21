@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import accounts, agents, auth, internal, market
+from .api import accounts, agents, auth, internal, market, portfolio
 from .config import settings
 from .database import init_db
 from .scheduler import shutdown_scheduler, start_scheduler
@@ -61,6 +61,7 @@ app.include_router(accounts.router)
 app.include_router(agents.router)
 app.include_router(market.router)
 app.include_router(internal.router)
+app.include_router(portfolio.router)
 
 
 @app.get("/health", tags=["meta"])
