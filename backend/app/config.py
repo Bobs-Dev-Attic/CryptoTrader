@@ -39,6 +39,17 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = True
     # Global floor on how often any agent may evaluate (seconds).
     min_agent_interval_seconds: int = 30
+    # Shared secret required to call the internal cron tick endpoint. When the
+    # app runs serverless (no long-lived process), an external scheduler
+    # (Vercel Cron / Supabase pg_cron) hits POST /api/internal/tick with this.
+    internal_cron_secret: str = ""
+
+    @property
+    def is_serverless(self) -> bool:
+        """True on Vercel (and similar) where background threads don't persist."""
+        import os
+
+        return bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
 
     # --- CORS ---
     # Comma-separated list of allowed origins for the web/mobile client.

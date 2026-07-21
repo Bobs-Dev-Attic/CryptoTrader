@@ -10,12 +10,61 @@ from ..schemas import CandleOut
 router = APIRouter(prefix="/api/market", tags=["market"])
 
 
+# Connection metadata used by the app's setup wizard.
+EXCHANGE_META: dict[str, dict] = {
+    "kraken": {
+        "name": "Kraken",
+        "needs_passphrase": False,
+        "docs_url": "https://support.kraken.com/hc/en-us/articles/360000919966",
+        "sample_symbol": "BTC/USD",
+        "permissions": ["Query Funds", "Create & Modify Orders"],
+        "tip": "Do NOT enable Withdraw. Consider restricting the key to your IP.",
+    },
+    "binance": {
+        "name": "Binance",
+        "needs_passphrase": False,
+        "docs_url": "https://www.binance.com/en/support/faq/how-to-create-api-360002502072",
+        "sample_symbol": "BTC/USDT",
+        "permissions": ["Enable Reading", "Enable Spot & Margin Trading"],
+        "tip": "Disable withdrawals on the API key. Use an IP allowlist if possible.",
+    },
+    "coinbase": {
+        "name": "Coinbase",
+        "needs_passphrase": True,
+        "docs_url": "https://help.coinbase.com/en/coinbase/trading-and-funding/advanced-trade-api",
+        "sample_symbol": "BTC/USD",
+        "permissions": ["trade", "view"],
+        "tip": "Coinbase Advanced keys include a passphrase. Never grant transfer/withdraw.",
+    },
+    "robinhood": {
+        "name": "Robinhood",
+        "needs_passphrase": False,
+        "docs_url": "https://docs.robinhood.com/crypto/trading/",
+        "sample_symbol": "BTC/USD",
+        "permissions": [],
+        "tip": "Live trading isn't supported in this build — Robinhood agents run in paper mode.",
+    },
+}
+
+
 @router.get("/exchanges")
 def list_exchanges() -> list[dict]:
-    return [
-        {"id": e.value, "name": e.value.capitalize(), "supports_live": get_adapter(e).supports_live}
-        for e in ExchangeId
-    ]
+    result = []
+    for e in ExchangeId:
+        meta = EXCHANGE_META.get(e.value, {})
+        result.append(
+            {
+                "id": e.value,
+                "name": meta.get("name", e.value.capitalize()),
+                "supports_live": get_adapter(e).supports_live,
+                "needs_passphrase": meta.get("needs_passphrase", False),
+                "docs_url": meta.get("docs_url", ""),
+                "sample_symbol": meta.get("sample_symbol", "BTC/USD"),
+                "permissions": meta.get("permissions", []),
+                "tip": meta.get("tip", ""),
+            }
+        )
+    return result
 
 
 @router.get("/candles", response_model=list[CandleOut])

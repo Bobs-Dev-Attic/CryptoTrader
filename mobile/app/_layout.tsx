@@ -49,6 +49,7 @@ export default function RootLayout() {
             <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="agent/new" options={{ title: "New Agent", presentation: "modal" }} />
             <Stack.Screen name="agent/[id]" options={{ title: "Agent" }} />
+            <Stack.Screen name="connect" options={{ title: "Connect an exchange", presentation: "modal" }} />
           </Stack>
         </AuthGate>
       </AuthProvider>

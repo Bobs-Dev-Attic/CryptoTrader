@@ -46,6 +46,22 @@ class ExchangeAccountCreate(BaseModel):
     api_passphrase: str = ""
 
 
+class ExchangeAccountValidate(BaseModel):
+    exchange: ExchangeId
+    api_key: str = ""
+    api_secret: str = ""
+    api_passphrase: str = ""
+
+
+class ValidationResult(BaseModel):
+    ok: bool
+    message: str
+    # True when the credentials authenticated against the exchange.
+    authenticated: bool = False
+    # Number of non-zero balances found (live keys only), if available.
+    asset_count: int | None = None
+
+
 class ExchangeAccountOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int

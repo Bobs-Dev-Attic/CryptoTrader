@@ -133,6 +133,17 @@ export interface ExchangeMeta {
   id: string;
   name: string;
   supports_live: boolean;
+  needs_passphrase: boolean;
+  docs_url: string;
+  sample_symbol: string;
+  permissions: string[];
+  tip: string;
+}
+export interface ValidationResult {
+  ok: boolean;
+  message: string;
+  authenticated: boolean;
+  asset_count: number | null;
 }
 
 // --- Endpoints ------------------------------------------------------------ //
@@ -178,6 +189,11 @@ export const api = {
   listAccounts: () => request<ExchangeAccount[]>("/api/accounts"),
   createAccount: (payload: Record<string, any>) =>
     request<ExchangeAccount>("/api/accounts", { method: "POST", body: JSON.stringify(payload) }),
+  validateAccount: (payload: Record<string, any>) =>
+    request<ValidationResult>("/api/accounts/validate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   deleteAccount: (id: number) =>
     request<void>(`/api/accounts/${id}`, { method: "DELETE" }),
 
