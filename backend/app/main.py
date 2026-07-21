@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import accounts, agents, auth, market
+from .api import accounts, agents, auth, internal, market
 from .config import settings
 from .database import init_db
 from .scheduler import shutdown_scheduler, start_scheduler
@@ -18,9 +18,13 @@ logging.basicConfig(level=logging.INFO)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    start_scheduler()
+    # In serverless there is no long-lived process for a background thread, so
+    # the in-process scheduler is skipped; an external cron hits /api/internal/tick.
+    if not settings.is_serverless:
+        start_scheduler()
     yield
-    shutdown_scheduler()
+    if not settings.is_serverless:
+        shutdown_scheduler()
 
 
 app = FastAPI(
@@ -42,6 +46,7 @@ app.include_router(auth.router)
 app.include_router(accounts.router)
 app.include_router(agents.router)
 app.include_router(market.router)
+app.include_router(internal.router)
 
 
 @app.get("/health", tags=["meta"])

@@ -6,11 +6,57 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import get_current_user
+from ..enums import ExchangeId
+from ..exchanges import get_adapter
 from ..models import ExchangeAccount, User
-from ..schemas import ExchangeAccountCreate, ExchangeAccountOut
+from ..schemas import (
+    ExchangeAccountCreate,
+    ExchangeAccountOut,
+    ExchangeAccountValidate,
+    ValidationResult,
+)
 from ..security import encrypt_secret
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
+
+
+@router.post("/validate", response_model=ValidationResult)
+def validate_credentials(
+    payload: ExchangeAccountValidate,
+    user: User = Depends(get_current_user),
+) -> ValidationResult:
+    """Test exchange credentials without saving them (used by the setup wizard)."""
+    if payload.exchange == ExchangeId.ROBINHOOD:
+        return ValidationResult(
+            ok=True,
+            authenticated=False,
+            message="Robinhood runs in paper mode in this build; no live keys needed.",
+        )
+
+    if not payload.api_key or not payload.api_secret:
+        return ValidationResult(
+            ok=True,
+            authenticated=False,
+            message="No credentials provided — this exchange can still be used for paper trading.",
+        )
+
+    adapter = get_adapter(
+        payload.exchange, payload.api_key, payload.api_secret, payload.api_passphrase
+    )
+    try:
+        balances = adapter.fetch_balance()
+    except Exception as exc:
+        return ValidationResult(
+            ok=False,
+            authenticated=False,
+            message=f"Could not authenticate: {type(exc).__name__}: {exc}",
+        )
+    return ValidationResult(
+        ok=True,
+        authenticated=True,
+        asset_count=len(balances),
+        message=f"Connected. Found {len(balances)} funded asset(s). Ready for live trading.",
+    )
 
 
 def _to_out(acc: ExchangeAccount) -> ExchangeAccountOut:

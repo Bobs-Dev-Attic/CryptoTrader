@@ -27,6 +27,9 @@ product: a FastAPI backend that connects to live exchanges plus an Expo
   real market data. Flip an agent to **live** when you're ready.
 - 🔐 **Encrypted API keys** — exchange secrets are stored encrypted (Fernet) and
   never returned to the client.
+- 🧭 **Setup wizard** — a guided flow walks you through connecting each exchange:
+  pick the platform, follow per-exchange key instructions (with the right
+  permissions), enter credentials, and **test the connection** before saving.
 - 📊 **Transparency** — every evaluation records a signal (with the indicator
   snapshot / LLM rationale) and every fill records a trade.
 - ⏱️ **Scheduler** — running agents are evaluated automatically on their
@@ -81,10 +84,17 @@ fetch candles → compute indicators → strategy decides (BUY/SELL/HOLD)
     → record signal → execute (paper ledger or live order) → record trade → update position
 ```
 
+## Deployment
+
+Deploys as two Vercel projects (Python serverless API + Expo web) backed by
+Supabase Postgres, with git auto-deploy on every push to `main`. See
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the step-by-step setup.
+
 ## Tech stack
 
-FastAPI · SQLAlchemy · ccxt · Anthropic Claude · APScheduler · JWT + bcrypt ·
-Fernet encryption · Expo / React Native / react-native-web · TypeScript.
+FastAPI · SQLAlchemy · ccxt · Anthropic Claude · APScheduler / Vercel Cron ·
+JWT + bcrypt · Fernet encryption · Expo / React Native / react-native-web ·
+TypeScript · Vercel · Supabase Postgres.
 
 ## Status & safety notes
 
