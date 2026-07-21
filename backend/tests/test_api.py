@@ -79,7 +79,11 @@ def test_portfolio_endpoints_and_equity_snapshots(client, auth_headers, fake_ada
     assert alloc.status_code == 200
     stats = client.get("/api/portfolio/stats", headers=auth_headers)
     assert stats.status_code == 200
-    assert stats.json()["agents"] >= 1
+    body = stats.json()
+    assert body["agents"] >= 1
+    # Win-rate fields are present (null until there are closed trades).
+    for k in ("win_rate", "wins", "losses", "closed_trades", "avg_win", "avg_loss"):
+        assert k in body
 
 
 def test_live_agent_requires_account(client, auth_headers):

@@ -197,6 +197,8 @@ class Trade(Base):
     price: Mapped[float] = mapped_column(Float)
     cost_quote: Mapped[float] = mapped_column(Float)  # quantity * price
     fee_quote: Mapped[float] = mapped_column(Float, default=0.0)
+    # Realized P&L booked by this order (nonzero only on position-closing sells).
+    realized_pnl: Mapped[float] = mapped_column(Float, default=0.0)
     trade_mode: Mapped[TradeMode] = mapped_column(String(8))
     status: Mapped[OrderStatus] = mapped_column(String(16), default=OrderStatus.FILLED)
     # Exchange order id for live trades; empty for paper.

@@ -182,6 +182,14 @@ export interface TickerQuote {
   last: number;
   change_pct: number | null;
 }
+export interface Candle {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
 
 // --- Endpoints ------------------------------------------------------------ //
 export const api = {
@@ -248,6 +256,14 @@ export const api = {
   agentEquity: (id: number) =>
     request<{ t: string; equity: number }[]>(`/api/agents/${id}/equity`),
 
+  candles: (exchange: string, symbol: string, timeframe = "1h", limit = 48) =>
+    request<Candle[]>(
+      `/api/market/candles?exchange=${encodeURIComponent(exchange)}&symbol=${encodeURIComponent(
+        symbol
+      )}&timeframe=${encodeURIComponent(timeframe)}&limit=${limit}`,
+      {},
+      false
+    ),
   tickers: (exchange: string, symbols: string[]) =>
     request<TickerQuote[]>(
       `/api/market/tickers?exchange=${encodeURIComponent(exchange)}&symbols=${encodeURIComponent(

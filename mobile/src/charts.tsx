@@ -1,8 +1,9 @@
 /** Lightweight SVG charts (equity line + allocation donut) for web and mobile. */
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import Svg, { Circle, G, Polyline } from "react-native-svg";
 
+import { api } from "./api";
 import { colors, spacing } from "./theme";
 
 /** Palette for donut slices / categorical series. */
@@ -128,5 +129,64 @@ export function Donut({
         ))}
       </View>
     </View>
+  );
+}
+
+/**
+ * A tiny price sparkline that fetches its own recent candles for an
+ * (exchange, symbol). Thin line, colored by direction, no axes.
+ */
+export function Sparkline({
+  exchange,
+  symbol,
+  timeframe = "1h",
+  width = 90,
+  height = 28,
+}: {
+  exchange: string;
+  symbol: string;
+  timeframe?: string;
+  width?: number;
+  height?: number;
+}) {
+  const [closes, setCloses] = useState<number[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    api
+      .candles(exchange, symbol, timeframe, 40)
+      .then((cs) => {
+        if (alive) setCloses(cs.map((c) => c.close));
+      })
+      .catch(() => {
+        /* leave empty */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [exchange, symbol, timeframe]);
+
+  if (closes.length < 2) {
+    return <View style={{ width, height }} />;
+  }
+  const pad = 2;
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const range = max - min || 1;
+  const x = (i: number) => pad + (i / (closes.length - 1)) * (width - 2 * pad);
+  const y = (v: number) => pad + (1 - (v - min) / range) * (height - 2 * pad);
+  const pts = closes.map((v, i) => `${x(i)},${y(v)}`).join(" ");
+  const up = closes[closes.length - 1] >= closes[0];
+
+  return (
+    <Svg width={width} height={height}>
+      <Polyline
+        points={pts}
+        fill="none"
+        stroke={up ? colors.green : colors.red}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+    </Svg>
   );
 }
