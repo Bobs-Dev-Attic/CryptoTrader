@@ -118,6 +118,107 @@ const HELP = {
     "The starting pretend cash for this paper agent, in the quote currency. Its profit/loss is measured against this.",
 };
 
+type PresetValues = {
+  name: string;
+  exchange: string;
+  symbol: string;
+  timeframe: string;
+  strategyType: "rule_based" | "llm";
+  useRsi: boolean;
+  useMacd: boolean;
+  useMaCross: boolean;
+  maFast: string;
+  maSlow: string;
+  guidance: string;
+  tradeMode: "paper" | "live";
+  orderSize: string;
+  interval: string;
+  paperBalance: string;
+};
+
+type Preset = { key: string; emoji: string; title: string; description: string; values: PresetValues };
+
+const BASE: PresetValues = {
+  name: "",
+  exchange: "kraken",
+  symbol: "BTC/USD",
+  timeframe: "1h",
+  strategyType: "rule_based",
+  useRsi: true,
+  useMacd: true,
+  useMaCross: true,
+  maFast: "20",
+  maSlow: "50",
+  guidance: "",
+  tradeMode: "paper",
+  orderSize: "100",
+  interval: "300",
+  paperBalance: "10000",
+};
+
+/** Ready-made starting points a beginner can tweak. All paper by default. */
+const PRESETS: Preset[] = [
+  {
+    key: "btc-starter",
+    emoji: "🟠",
+    title: "Bitcoin starter",
+    description:
+      "A balanced first bot. Buys or sells BTC only when RSI, MACD and the trend all agree — fewer, higher-conviction trades.",
+    values: { ...BASE, name: "Bitcoin starter", exchange: "kraken", symbol: "BTC/USD", timeframe: "1h" },
+  },
+  {
+    key: "eth-trend",
+    emoji: "🔷",
+    title: "Ethereum trend-follower",
+    description:
+      "Rides medium-term Ethereum trends on the 4-hour chart using MACD + moving-average crossover; ignores short-term noise (RSI off).",
+    values: {
+      ...BASE,
+      name: "Ethereum trend-follower",
+      exchange: "binance",
+      symbol: "ETH/USDT",
+      timeframe: "4h",
+      useRsi: false,
+      useMacd: true,
+      useMaCross: true,
+    },
+  },
+  {
+    key: "dip-buyer",
+    emoji: "🟢",
+    title: "Dip buyer",
+    description:
+      "Waits for oversold dips and buys the bounce, then sells when overbought. Uses RSI only for a simpler, contrarian style.",
+    values: {
+      ...BASE,
+      name: "Dip buyer",
+      exchange: "coinbase",
+      symbol: "BTC/USD",
+      timeframe: "1h",
+      useRsi: true,
+      useMacd: false,
+      useMaCross: false,
+    },
+  },
+  {
+    key: "ai-analyst",
+    emoji: "🤖",
+    title: "AI analyst (Claude)",
+    description:
+      "Lets Claude weigh the market like a cautious analyst. Needs an AI key configured on the server; without one it just holds.",
+    values: {
+      ...BASE,
+      name: "AI analyst",
+      exchange: "kraken",
+      symbol: "BTC/USD",
+      timeframe: "1h",
+      strategyType: "llm",
+      guidance:
+        "Prioritize capital preservation. Avoid trading in high volatility and only act on strong, confirmed signals.",
+    },
+  },
+];
+
 export default function NewAgent() {
   const router = useRouter();
   const [exchanges, setExchanges] = useState<ExchangeMeta[]>([]);
@@ -146,6 +247,27 @@ export default function NewAgent() {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [activePreset, setActivePreset] = useState<string | null>(null);
+
+  const applyPreset = (p: Preset) => {
+    const v = p.values;
+    setName(v.name);
+    setExchange(v.exchange);
+    setSymbol(v.symbol);
+    setTimeframe(v.timeframe);
+    setStrategyType(v.strategyType);
+    setUseRsi(v.useRsi);
+    setUseMacd(v.useMacd);
+    setUseMaCross(v.useMaCross);
+    setMaFast(v.maFast);
+    setMaSlow(v.maSlow);
+    setGuidance(v.guidance);
+    setTradeMode(v.tradeMode);
+    setOrderSize(v.orderSize);
+    setIntervalSec(v.interval);
+    setPaperBalance(v.paperBalance);
+    setActivePreset(p.key);
+  };
 
   useEffect(() => {
     (async () => {
@@ -206,6 +328,50 @@ export default function NewAgent() {
         <Text style={{ fontWeight: "700" }}>paper (simulated) mode</Text> by default, so you can try
         ideas with zero risk. Tap the ⓘ next to any option for a plain-language explanation.
       </HelpNote>
+
+      {/* Example presets — a beginner can start here and tweak. */}
+      <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: spacing.xs }}>
+        Start from an example
+      </Text>
+      <Text style={{ color: colors.textDim, fontSize: 13, marginBottom: spacing.md }}>
+        Tap one to fill in the form, then adjust anything you like.
+      </Text>
+      {PRESETS.map((p) => {
+        const active = activePreset === p.key;
+        return (
+          <Pressable key={p.key} onPress={() => applyPreset(p)}>
+            <View
+              style={{
+                flexDirection: "row",
+                backgroundColor: colors.surface,
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor: active ? colors.primary : colors.border,
+                padding: spacing.md,
+                marginBottom: spacing.sm,
+              }}
+            >
+              <Text style={{ fontSize: 22, marginRight: spacing.md }}>{p.emoji}</Text>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <Text style={{ color: colors.text, fontSize: 15, fontWeight: "600" }}>{p.title}</Text>
+                  {active ? (
+                    <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>✓ applied</Text>
+                  ) : null}
+                </View>
+                <Text style={{ color: colors.textDim, fontSize: 12, lineHeight: 17, marginTop: 2 }}>
+                  {p.description}
+                </Text>
+              </View>
+            </View>
+          </Pressable>
+        );
+      })}
+
+      <View style={{ height: spacing.md }} />
+      <Text style={{ color: colors.textDim, fontSize: 13, marginBottom: spacing.sm }}>
+        …or configure everything yourself below.
+      </Text>
 
       <Card>
         <Field label="Name" value={name} onChangeText={setName} help={HELP.name} />

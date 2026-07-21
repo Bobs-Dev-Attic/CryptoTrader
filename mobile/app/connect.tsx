@@ -4,8 +4,20 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 
 import { api, ExchangeMeta, ValidationResult } from "@/api";
-import { Badge, Button, Card, Field } from "@/components";
+import { Badge, Button, Card, Field, HelpNote } from "@/components";
 import { colors, radius, spacing } from "@/theme";
+
+/** Plain-language help for the connection wizard fields. */
+const HELP = {
+  label:
+    "A name for you to recognize this connection later, e.g. 'My Kraken'. It doesn't affect trading.",
+  apiKey:
+    "The public identifier of the API key you created on the exchange. Safe to paste — it's like a username for the key.",
+  apiSecret:
+    "The secret half of the API key — treat it like a password. It's encrypted on the server and never shown again. Never share it with anyone.",
+  passphrase:
+    "An extra password some exchanges (like Coinbase Advanced) attach to an API key when you create it. Enter the same passphrase you set on the exchange.",
+};
 
 const STEPS = ["Exchange", "Get keys", "Credentials", "Connect"];
 
@@ -123,9 +135,12 @@ export default function ConnectWizard() {
           <Text style={{ color: colors.text, fontSize: 18, fontWeight: "700", marginBottom: spacing.sm }}>
             Which exchange?
           </Text>
-          <Text style={{ color: colors.textDim, marginBottom: spacing.lg }}>
-            Pick the platform you want to connect. You can link more than one.
-          </Text>
+          <HelpNote>
+            Connecting an exchange lets your <Text style={{ fontWeight: "700" }}>live</Text> agents place
+            real orders there. You only need to do this for live trading — {""}
+            <Text style={{ fontWeight: "700" }}>paper (simulated) agents work without any keys</Text>. Pick a
+            platform below; you can link more than one.
+          </HelpNote>
           {exchanges.map((ex) => (
             <Pressable key={ex.id} onPress={() => choose(ex)}>
               <Card>
@@ -203,9 +218,28 @@ export default function ConnectWizard() {
             Keys are encrypted on the server and never shown again. Leave blank to use paper trading only.
           </Text>
           <Card>
-            <Field label="Label" value={label} onChangeText={setLabel} placeholder={`My ${selected.name}`} />
-            <Field label="API key" value={apiKey} onChangeText={setApiKey} autoCapitalize="none" />
-            <Field label="API secret" value={apiSecret} onChangeText={setApiSecret} autoCapitalize="none" secureTextEntry />
+            <Field
+              label="Label"
+              value={label}
+              onChangeText={setLabel}
+              placeholder={`My ${selected.name}`}
+              help={HELP.label}
+            />
+            <Field
+              label="API key"
+              value={apiKey}
+              onChangeText={setApiKey}
+              autoCapitalize="none"
+              help={HELP.apiKey}
+            />
+            <Field
+              label="API secret"
+              value={apiSecret}
+              onChangeText={setApiSecret}
+              autoCapitalize="none"
+              secureTextEntry
+              help={HELP.apiSecret}
+            />
             {selected.needs_passphrase && (
               <Field
                 label="Passphrase"
@@ -213,6 +247,7 @@ export default function ConnectWizard() {
                 onChangeText={setPassphrase}
                 autoCapitalize="none"
                 secureTextEntry
+                help={HELP.passphrase}
               />
             )}
           </Card>
