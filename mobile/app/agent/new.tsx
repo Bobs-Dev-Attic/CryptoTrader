@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, Switch, Text, View } from "react-native";
 
@@ -248,9 +248,9 @@ export default function NewAgent() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [activePreset, setActivePreset] = useState<string | null>(null);
+  const params = useLocalSearchParams<{ prefill?: string }>();
 
-  const applyPreset = (p: Preset) => {
-    const v = p.values;
+  const applyValues = (v: PresetValues) => {
     setName(v.name);
     setExchange(v.exchange);
     setSymbol(v.symbol);
@@ -266,8 +266,24 @@ export default function NewAgent() {
     setOrderSize(v.orderSize);
     setIntervalSec(v.interval);
     setPaperBalance(v.paperBalance);
+  };
+
+  const applyPreset = (p: Preset) => {
+    applyValues(p.values);
     setActivePreset(p.key);
   };
+
+  // "Save As" from an existing agent passes a prefill payload; apply it once.
+  useEffect(() => {
+    if (!params.prefill) return;
+    try {
+      const parsed = JSON.parse(params.prefill);
+      applyValues({ ...BASE, ...parsed });
+    } catch {
+      /* ignore malformed prefill */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.prefill]);
 
   useEffect(() => {
     (async () => {

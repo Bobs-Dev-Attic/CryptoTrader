@@ -177,6 +177,11 @@ export interface ValidationResult {
   authenticated: boolean;
   asset_count: number | null;
 }
+export interface TickerQuote {
+  symbol: string;
+  last: number;
+  change_pct: number | null;
+}
 
 // --- Endpoints ------------------------------------------------------------ //
 export const api = {
@@ -236,4 +241,12 @@ export const api = {
     request<void>(`/api/accounts/${id}`, { method: "DELETE" }),
 
   exchanges: () => request<ExchangeMeta[]>("/api/market/exchanges", {}, false),
+  tickers: (exchange: string, symbols: string[]) =>
+    request<TickerQuote[]>(
+      `/api/market/tickers?exchange=${encodeURIComponent(exchange)}&symbols=${encodeURIComponent(
+        symbols.join(",")
+      )}`,
+      {},
+      false
+    ),
 };

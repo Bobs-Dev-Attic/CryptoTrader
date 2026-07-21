@@ -82,6 +82,22 @@ def candles(
     return [CandleOut(**row.__dict__) for row in rows]
 
 
+@router.get("/tickers")
+def tickers(
+    exchange: ExchangeId,
+    symbols: str = Query(..., description="Comma-separated, e.g. BTC/USD,ETH/USD"),
+) -> list[dict]:
+    """Batch price + 24h change for a set of symbols (powers the dashboard ticker)."""
+    syms = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    if not syms:
+        return []
+    adapter = get_adapter(exchange)
+    try:
+        return adapter.fetch_price_tickers(syms)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Market data error: {exc}")
+
+
 @router.get("/ticker")
 def ticker(exchange: ExchangeId, symbol: str) -> dict:
     adapter = get_adapter(exchange)

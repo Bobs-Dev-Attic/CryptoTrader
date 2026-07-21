@@ -82,6 +82,27 @@ class CcxtAdapter(ExchangeAdapter):
             timestamp=int(t.get("timestamp") or 0),
         )
 
+    def fetch_price_tickers(self, symbols: list[str]) -> list[dict]:
+        try:
+            data = self.client.fetch_tickers(symbols)
+        except Exception:
+            # Some exchanges don't support batch fetch_tickers; fall back.
+            return super().fetch_price_tickers(symbols)
+        out: list[dict] = []
+        for s in symbols:
+            t = data.get(s)
+            if not t:
+                continue
+            pct = t.get("percentage")
+            out.append(
+                {
+                    "symbol": s,
+                    "last": float(t.get("last") or t.get("close") or 0.0),
+                    "change_pct": float(pct) if pct is not None else None,
+                }
+            )
+        return out
+
     # --- Account (live) ------------------------------------------------ #
     def fetch_balance(self) -> dict[str, float]:
         bal = self.client.fetch_balance()
