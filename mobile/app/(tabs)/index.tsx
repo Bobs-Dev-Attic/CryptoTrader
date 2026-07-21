@@ -5,7 +5,19 @@ import { RefreshControl, ScrollView, Text, View } from "react-native";
 import { Agent, api } from "@/api";
 import { useAuth } from "@/auth";
 import { Badge, Button, Card } from "@/components";
-import { colors, pnlColor, spacing } from "@/theme";
+import { PriceTicker } from "@/PriceTicker";
+import { colors, pnlColor, radius, spacing } from "@/theme";
+
+const TICKER_SYMBOLS = [
+  "BTC/USD",
+  "ETH/USD",
+  "SOL/USD",
+  "XRP/USD",
+  "ADA/USD",
+  "DOGE/USD",
+  "LTC/USD",
+  "DOT/USD",
+];
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -46,6 +58,8 @@ export default function Dashboard() {
       contentContainerStyle={{ padding: spacing.lg }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
+      <PriceTicker symbols={TICKER_SYMBOLS} />
+
       <Text style={{ color: colors.textDim, marginBottom: spacing.lg }}>
         Signed in as {user?.email}
       </Text>
@@ -62,6 +76,13 @@ export default function Dashboard() {
           valueColor={pnlColor(realized)}
         />
       </View>
+
+      {agents.length > 0 && (
+        <>
+          <View style={{ height: spacing.lg }} />
+          <PnlChart agents={agents} />
+        </>
+      )}
 
       <View style={{ height: spacing.lg }} />
       <Text style={{ color: colors.text, fontSize: 18, fontWeight: "700", marginBottom: spacing.md }}>
@@ -97,6 +118,56 @@ export default function Dashboard() {
       <View style={{ height: spacing.xl }} />
       <Button title="Log out" variant="secondary" onPress={logout} />
     </ScrollView>
+  );
+}
+
+/** Horizontal bar chart of each agent's realized P&L (dependency-free). */
+function PnlChart({ agents }: { agents: Agent[] }) {
+  const rows = agents.map((a) => ({
+    name: a.name,
+    pnl: a.position?.realized_pnl ?? 0,
+  }));
+  const maxAbs = Math.max(1, ...rows.map((r) => Math.abs(r.pnl)));
+  const anyNonZero = rows.some((r) => r.pnl !== 0);
+
+  return (
+    <Card>
+      <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: spacing.md }}>
+        Realized P&L by agent
+      </Text>
+      {!anyNonZero ? (
+        <Text style={{ color: colors.textDim, fontSize: 13 }}>
+          No closed trades yet — each agent's profit/loss will chart here once it buys and sells.
+        </Text>
+      ) : (
+        rows.map((r, i) => {
+          const pct = Math.min(1, Math.abs(r.pnl) / maxAbs);
+          const positive = r.pnl >= 0;
+          return (
+            <View key={i} style={{ marginBottom: spacing.sm }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
+                <Text style={{ color: colors.textDim, fontSize: 12 }} numberOfLines={1}>
+                  {r.name}
+                </Text>
+                <Text style={{ color: pnlColor(r.pnl), fontSize: 12, fontWeight: "600" }}>
+                  {r.pnl >= 0 ? "+" : ""}${r.pnl.toFixed(2)}
+                </Text>
+              </View>
+              <View style={{ height: 8, backgroundColor: colors.surfaceAlt, borderRadius: 4, overflow: "hidden" }}>
+                <View
+                  style={{
+                    height: 8,
+                    width: `${Math.max(pct * 100, 2)}%`,
+                    backgroundColor: positive ? colors.green : colors.red,
+                    borderRadius: 4,
+                  }}
+                />
+              </View>
+            </View>
+          );
+        })
+      )}
+    </Card>
   );
 }
 

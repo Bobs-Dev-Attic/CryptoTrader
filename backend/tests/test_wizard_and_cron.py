@@ -14,6 +14,27 @@ def test_exchanges_expose_wizard_metadata(client):
     assert by_id["kraken"]["docs_url"].startswith("http")
 
 
+def test_batch_tickers_endpoint(client, monkeypatch):
+    from app.api import market as market_api
+
+    class FakeTickerAdapter:
+        def fetch_price_tickers(self, symbols):
+            return [{"symbol": s, "last": 100.0, "change_pct": 1.5} for s in symbols]
+
+    monkeypatch.setattr(market_api, "get_adapter", lambda *a, **k: FakeTickerAdapter())
+    resp = client.get("/api/market/tickers?exchange=kraken&symbols=BTC/USD,ETH/USD")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [d["symbol"] for d in data] == ["BTC/USD", "ETH/USD"]
+    assert data[0]["change_pct"] == 1.5
+
+
+def test_batch_tickers_empty_symbols(client):
+    resp = client.get("/api/market/tickers?exchange=kraken&symbols=")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
 def test_validate_without_keys_allows_paper(client, auth_headers):
     resp = client.post(
         "/api/accounts/validate",

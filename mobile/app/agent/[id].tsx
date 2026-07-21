@@ -135,6 +135,36 @@ export default function AgentDetailScreen() {
         </View>
         <View style={{ height: spacing.md }} />
         <Button
+          title="Save as new agent"
+          variant="secondary"
+          onPress={() => {
+            const cfg: any = agent.strategy_config || {};
+            const prefill = {
+              name: `${agent.name} (copy)`,
+              exchange: agent.exchange,
+              symbol: agent.symbol,
+              timeframe: agent.timeframe,
+              strategyType: agent.strategy_type,
+              useRsi: cfg.use_rsi ?? true,
+              useMacd: cfg.use_macd ?? true,
+              useMaCross: cfg.use_ma_cross ?? true,
+              maFast: String(cfg.ma_fast ?? 20),
+              maSlow: String(cfg.ma_slow ?? 50),
+              guidance: cfg.guidance ?? "",
+              // Copies default to paper so a duplicate never trades real money by surprise.
+              tradeMode: "paper",
+              orderSize: String(agent.order_size_quote),
+              interval: String(agent.interval_seconds),
+              paperBalance: String(agent.paper_balance_quote),
+            };
+            router.push({ pathname: "/agent/new", params: { prefill: JSON.stringify(prefill) } });
+          }}
+        />
+        <Text style={{ color: colors.textDim, fontSize: 12, marginTop: spacing.xs }}>
+          Opens the new-agent form pre-filled with this agent's settings (as a fresh paper agent).
+        </Text>
+        <View style={{ height: spacing.md }} />
+        <Button
           title="Delete agent"
           variant="danger"
           onPress={() =>

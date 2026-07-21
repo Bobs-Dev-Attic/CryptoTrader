@@ -73,6 +73,21 @@ class ExchangeAdapter(abc.ABC):
     def fetch_ticker(self, symbol: str) -> Ticker:
         """Return the latest ticker for a symbol."""
 
+    def fetch_price_tickers(self, symbols: list[str]) -> list[dict]:
+        """Return [{symbol, last, change_pct}] for many symbols.
+
+        Default implementation fetches each symbol individually (no 24h change).
+        Adapters with a batch endpoint should override for efficiency.
+        """
+        out: list[dict] = []
+        for s in symbols:
+            try:
+                t = self.fetch_ticker(s)
+                out.append({"symbol": s, "last": t.last, "change_pct": None})
+            except Exception:
+                continue
+        return out
+
     # --- Account (private, live only) ------------------------------------- #
     def fetch_balance(self) -> dict[str, float]:
         """Return free balances keyed by asset. Live adapters override."""
