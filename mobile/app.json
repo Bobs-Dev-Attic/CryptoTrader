@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "CryptoTrader",
+    "slug": "cryptotrader",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "cryptotrader",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#0b0f1a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bobsdevattic.cryptotrader"
+    },
+    "android": {
+      "package": "com.bobsdevattic.cryptotrader"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-router"],
+    "extra": {
+      "apiBaseUrl": "http://localhost:8000"
+    }
+  }
+}
