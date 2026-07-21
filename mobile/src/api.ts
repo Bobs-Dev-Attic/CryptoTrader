@@ -42,7 +42,14 @@ async function request<T>(
     const token = await getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
-  const resp = await fetch(`${getBaseUrl()}${path}`, { ...options, headers });
+  const base = getBaseUrl();
+  let resp: Response;
+  try {
+    resp = await fetch(`${base}${path}`, { ...options, headers });
+  } catch {
+    // fetch throws (TypeError) when the server is unreachable / blocked.
+    throw new ApiError(0, unreachableMessage(base));
+  }
   const text = await resp.text();
   const data = text ? JSON.parse(text) : null;
   if (!resp.ok) {
@@ -50,6 +57,17 @@ async function request<T>(
     throw new ApiError(resp.status, typeof detail === "string" ? detail : JSON.stringify(detail));
   }
   return data as T;
+}
+
+/** Human-friendly message when the API host can't be reached. */
+export function unreachableMessage(base: string): string {
+  if (base.includes("localhost") || base.includes("127.0.0.1")) {
+    return (
+      `Can't reach the API — this build is pointed at ${base}. ` +
+      `Set EXPO_PUBLIC_API_URL to your deployed backend URL and redeploy the web app.`
+    );
+  }
+  return `Can't reach the API at ${base}. Is the backend deployed and running?`;
 }
 
 // --- Types (mirror backend schemas) --------------------------------------- //
@@ -158,11 +176,17 @@ export const api = {
   login: async (email: string, password: string) => {
     // OAuth2 password flow expects form-encoded body.
     const body = new URLSearchParams({ username: email, password }).toString();
-    const resp = await fetch(`${getBaseUrl()}/api/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-    });
+    const base = getBaseUrl();
+    let resp: Response;
+    try {
+      resp = await fetch(`${base}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+      });
+    } catch {
+      throw new ApiError(0, unreachableMessage(base));
+    }
     const data = await resp.json();
     if (!resp.ok) throw new ApiError(resp.status, data?.detail || "Login failed");
     return data as TokenResponse;
