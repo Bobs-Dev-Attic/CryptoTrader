@@ -16,13 +16,29 @@ GitHub (main)
 
 ## 1. Provision the database (Supabase)
 
-1. Create a Supabase project (any region). Wait for it to finish provisioning.
-2. In **Project Settings → Database → Connection string**, copy the **URI**
-   (looks like `postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres`).
-3. Keep it handy — it's the backend's `DATABASE_URL`.
+A project named **`cryptotrader`** has already been provisioned (region
+`us-east-1`, ref `wjqbouylzsijrlkynfsa`), the schema is applied, and Row Level
+Security is enabled on every table. You only need the **connection string**:
 
-> Tables are created automatically on the API's first cold start
-> (`Base.metadata.create_all`). No manual migration is required to start.
+1. Supabase dashboard → project **cryptotrader** → **Connect** (top bar).
+2. Choose **Connection string → URI**, and pick the **Transaction pooler**
+   (the IPv4 "Shared Pooler" — required because Vercel functions are IPv4-only
+   and the direct `db.<ref>.supabase.co` host is IPv6-only).
+3. If it shows `[YOUR-PASSWORD]`, reset it under **Settings → Database → Reset
+   database password** and paste the new password in.
+
+The result looks like:
+
+```
+postgresql://postgres.wjqbouylzsijrlkynfsa:<password>@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require
+```
+
+That value is the backend's `DATABASE_URL`.
+
+> **Why it's already secure:** the backend connects as the `postgres` role, which
+> owns the tables and therefore bypasses RLS — while the enabled RLS blocks the
+> anon Supabase REST API from touching your data. The schema is pre-created, so
+> no migration runs on first boot.
 
 ## 2. Deploy the backend (Vercel project #1)
 

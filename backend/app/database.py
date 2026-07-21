@@ -5,6 +5,7 @@ from collections.abc import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from .config import settings
 
@@ -14,11 +15,14 @@ connect_args = (
     {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
 )
 
-engine = create_engine(
-    settings.database_url,
-    connect_args=connect_args,
-    pool_pre_ping=True,
-)
+# In serverless, each invocation is short-lived and there may be many concurrent
+# function instances; a per-instance connection pool would exhaust Postgres.
+# Use NullPool and let Supabase's connection pooler (pgbouncer) manage pooling.
+engine_kwargs: dict = {"connect_args": connect_args, "pool_pre_ping": True}
+if settings.is_serverless and not settings.database_url.startswith("sqlite"):
+    engine_kwargs["poolclass"] = NullPool
+
+engine = create_engine(settings.database_url, **engine_kwargs)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
