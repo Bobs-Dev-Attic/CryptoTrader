@@ -147,9 +147,11 @@ def self_execute(
 ) -> None:
     """Execute a BUY or SELL for the agent in its configured trade mode."""
     result: OrderResult | None = None
+    trade_realized = 0.0  # P&L booked by this order (sells that close a position)
 
     if agent.trade_mode == TradeMode.PAPER:
         broker = PaperBroker()
+        prev_realized = position.realized_pnl
         ledger = Ledger(
             cash_quote=position.cash_quote,
             quantity=position.quantity,
@@ -162,6 +164,7 @@ def self_execute(
             result = broker.sell_all(ledger, agent.symbol, price)
 
         if result is not None:
+            trade_realized = ledger.realized_pnl - prev_realized
             # Persist the mutated ledger back onto the position.
             position.cash_quote = ledger.cash_quote
             position.quantity = ledger.quantity
@@ -188,8 +191,8 @@ def self_execute(
             if qty <= 0:
                 return
             result = adapter.create_market_order(agent.symbol, "sell", qty)
-            realized = (result.price - position.avg_entry_price) * result.quantity
-            position.realized_pnl += realized
+            trade_realized = (result.price - position.avg_entry_price) * result.quantity
+            position.realized_pnl += trade_realized
             position.quantity = 0.0
             position.avg_entry_price = 0.0
 
@@ -206,6 +209,7 @@ def self_execute(
         price=result.price,
         cost_quote=result.cost,
         fee_quote=result.fee,
+        realized_pnl=trade_realized,
         trade_mode=agent.trade_mode,
         status=OrderStatus(result.status) if result.status in OrderStatus._value2member_map_ else OrderStatus.FILLED,
         external_id=result.external_id,

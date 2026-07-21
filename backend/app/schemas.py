@@ -150,6 +150,7 @@ class TradeOut(BaseModel):
     price: float
     cost_quote: float
     fee_quote: float
+    realized_pnl: float = 0.0
     trade_mode: TradeMode
     status: str
     external_id: str

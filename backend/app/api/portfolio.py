@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import Agent, EquitySnapshot, User
+from ..enums import OrderSide
+from ..models import Agent, EquitySnapshot, Trade, User
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
@@ -84,6 +85,24 @@ def stats(
             with_pnl += 1
             if a.position.realized_pnl > 0:
                 profitable += 1
+    # Win/loss stats from position-closing sell trades.
+    agent_ids = [a.id for a in agents]
+    wins = losses = 0
+    win_sum = loss_sum = 0.0
+    if agent_ids:
+        sells = (
+            db.query(Trade)
+            .filter(Trade.agent_id.in_(agent_ids), Trade.side == OrderSide.SELL)
+            .all()
+        )
+        for t in sells:
+            if t.realized_pnl > 0:
+                wins += 1
+                win_sum += t.realized_pnl
+            elif t.realized_pnl < 0:
+                losses += 1
+                loss_sum += t.realized_pnl
+    closed = wins + losses
     return {
         "agents": len(agents),
         "running": sum(1 for a in agents if str(a.status) == "running"),
@@ -93,4 +112,11 @@ def stats(
         "equity": round(deployed + cash, 2),
         "profitable_agents": profitable,
         "agents_with_trades": with_pnl,
+        # Trade win/loss analytics.
+        "closed_trades": closed,
+        "wins": wins,
+        "losses": losses,
+        "win_rate": round(wins / closed, 3) if closed else None,
+        "avg_win": round(win_sum / wins, 2) if wins else None,
+        "avg_loss": round(loss_sum / losses, 2) if losses else None,
     }

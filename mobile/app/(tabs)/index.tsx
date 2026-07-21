@@ -4,7 +4,7 @@ import { RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { Agent, api } from "@/api";
 import { useAuth } from "@/auth";
-import { Donut, LineChart } from "@/charts";
+import { Donut, LineChart, Sparkline } from "@/charts";
 import { Badge, Button, Card } from "@/components";
 import { PriceTicker } from "@/PriceTicker";
 import { colors, pnlColor, radius, spacing } from "@/theme";
@@ -26,19 +26,22 @@ export default function Dashboard() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [history, setHistory] = useState<{ t: string; equity: number }[]>([]);
   const [allocation, setAllocation] = useState<{ label: string; value: number; symbol: string }[]>([]);
+  const [stats, setStats] = useState<Record<string, number | null> | null>(null);
   const [chartW, setChartW] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [ag, hist, alloc] = await Promise.all([
+      const [ag, hist, alloc, st] = await Promise.all([
         api.listAgents(),
         api.portfolioHistory().catch(() => []),
         api.portfolioAllocation().catch(() => []),
+        api.portfolioStats().catch(() => null),
       ]);
       setAgents(ag);
       setHistory(hist);
       setAllocation(alloc);
+      setStats(st);
     } catch {
       /* handled by empty state */
     }
@@ -87,6 +90,22 @@ export default function Dashboard() {
           valueColor={pnlColor(realized)}
         />
       </View>
+
+      {stats && (stats.closed_trades ?? 0) > 0 && (
+        <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.md }}>
+          <Stat
+            label="Win rate"
+            value={stats.win_rate != null ? `${Math.round((stats.win_rate as number) * 100)}%` : "—"}
+            valueColor={
+              (stats.win_rate ?? 0) >= 0.5 ? colors.green : colors.red
+            }
+          />
+          <Stat
+            label="Trades (W/L)"
+            value={`${stats.wins ?? 0}/${stats.losses ?? 0}`}
+          />
+        </View>
+      )}
 
       {history.length >= 2 && (
         <>
@@ -139,10 +158,13 @@ export default function Dashboard() {
           <Card key={a.id}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text style={{ color: colors.text, fontSize: 16, fontWeight: "600" }}>{a.name}</Text>
-              <Badge
-                label={a.status}
-                color={a.status === "running" ? colors.green : a.status === "error" ? colors.red : colors.textDim}
-              />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                <Sparkline exchange={a.exchange} symbol={a.symbol} timeframe={a.timeframe} />
+                <Badge
+                  label={a.status}
+                  color={a.status === "running" ? colors.green : a.status === "error" ? colors.red : colors.textDim}
+                />
+              </View>
             </View>
             <Text style={{ color: colors.textDim, marginTop: spacing.xs }}>
               {a.exchange.toUpperCase()} · {a.symbol} · {a.trade_mode} · {a.strategy_type}
