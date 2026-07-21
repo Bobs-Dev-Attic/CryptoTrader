@@ -15,9 +15,23 @@ from .scheduler import shutdown_scheduler, start_scheduler
 logging.basicConfig(level=logging.INFO)
 
 
+logger = logging.getLogger("cryptotrader.startup")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    # Ensure tables exist, but NEVER let DB setup crash app startup. In
+    # serverless the DB may be unreachable (e.g. DATABASE_URL not yet set), and
+    # the managed schema is created via migrations anyway — so non-DB endpoints
+    # (/health, /api/market/*) must still come up. DB-backed endpoints will
+    # surface their own errors until the database is configured.
+    try:
+        init_db()
+    except Exception:
+        logger.exception(
+            "init_db() failed at startup; continuing. DB-backed endpoints will "
+            "error until DATABASE_URL points at a reachable database."
+        )
     # In serverless there is no long-lived process for a background thread, so
     # the in-process scheduler is skipped; an external cron hits /api/internal/tick.
     if not settings.is_serverless:
