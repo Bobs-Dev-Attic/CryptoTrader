@@ -78,6 +78,9 @@ After it redeploys:
   wrong `DATABASE_URL` (must be the **pooler** URI, not `db.<ref>.supabase.co`).
 - **Login shows "Can't reach the API … localhost"** → you're on an old web build;
   redeploy so the same-origin default takes effect.
+- **A merge to `main` didn't auto-deploy** → occasionally a push webhook is
+  missed. Push any commit, or use the Vercel dashboard's **Redeploy** on the
+  latest commit, to build it.
 
 ## 4. Scheduling the agent tick
 
