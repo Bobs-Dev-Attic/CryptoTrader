@@ -20,7 +20,7 @@ from ..enums import (
 from ..exchanges import get_adapter
 from ..exchanges.base import OrderResult
 from ..exchanges.paper import Ledger, PaperBroker
-from ..models import Agent, Position, Signal, Trade
+from ..models import Agent, EquitySnapshot, Position, Signal, Trade
 from ..security import decrypt_secret
 from .base import StrategyContext
 from .registry import build_strategy
@@ -121,6 +121,17 @@ def run_agent_once(db: Session, agent: Agent) -> Signal:
     else:
         agent.status = AgentStatus.RUNNING
         agent.last_error = ""
+
+    # Record an equity snapshot for the equity curve (cash + position at mark).
+    equity = position.cash_quote + position.quantity * current_price
+    db.add(
+        EquitySnapshot(
+            agent_id=agent.id,
+            equity=equity,
+            realized_pnl=position.realized_pnl,
+            price=current_price,
+        )
+    )
 
     db.commit()
     return signal

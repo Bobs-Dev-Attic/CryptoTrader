@@ -4,6 +4,7 @@ import { RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { Agent, api } from "@/api";
 import { useAuth } from "@/auth";
+import { Donut, LineChart } from "@/charts";
 import { Badge, Button, Card } from "@/components";
 import { PriceTicker } from "@/PriceTicker";
 import { colors, pnlColor, radius, spacing } from "@/theme";
@@ -23,11 +24,21 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [history, setHistory] = useState<{ t: string; equity: number }[]>([]);
+  const [allocation, setAllocation] = useState<{ label: string; value: number; symbol: string }[]>([]);
+  const [chartW, setChartW] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setAgents(await api.listAgents());
+      const [ag, hist, alloc] = await Promise.all([
+        api.listAgents(),
+        api.portfolioHistory().catch(() => []),
+        api.portfolioAllocation().catch(() => []),
+      ]);
+      setAgents(ag);
+      setHistory(hist);
+      setAllocation(alloc);
     } catch {
       /* handled by empty state */
     }
@@ -77,9 +88,36 @@ export default function Dashboard() {
         />
       </View>
 
-      {agents.length > 0 && (
+      {history.length >= 2 && (
         <>
           <View style={{ height: spacing.lg }} />
+          <Card>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700" }}>Portfolio equity</Text>
+              <Text style={{ color: pnlColor(history[history.length - 1].equity - history[0].equity), fontSize: 13, fontWeight: "600" }}>
+                ${history[history.length - 1].equity.toFixed(2)}
+              </Text>
+            </View>
+            <View style={{ height: spacing.sm }} />
+            <View onLayout={(e) => setChartW(e.nativeEvent.layout.width)}>
+              <LineChart values={history.map((h) => h.equity)} width={chartW} height={130} />
+            </View>
+          </Card>
+        </>
+      )}
+
+      {allocation.length > 0 && (
+        <Card>
+          <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: spacing.md }}>
+            Allocation
+          </Text>
+          <Donut slices={allocation} />
+        </Card>
+      )}
+
+      {agents.length > 0 && (
+        <>
+          <View style={{ height: spacing.sm }} />
           <PnlChart agents={agents} />
         </>
       )}

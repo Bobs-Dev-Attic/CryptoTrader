@@ -49,6 +49,39 @@ def test_create_and_run_paper_agent(client, auth_headers, fake_adapter):
     assert detail["recent_trades"][0]["side"] == "buy"
 
 
+def test_portfolio_endpoints_and_equity_snapshots(client, auth_headers, fake_adapter):
+    # Create a paper agent and run it so an equity snapshot is recorded.
+    payload = {
+        "name": "PF agent",
+        "exchange": "kraken",
+        "symbol": "BTC/USD",
+        "strategy_type": "rule_based",
+        "strategy_config": {"use_rsi": False},
+        "trade_mode": "paper",
+        "order_size_quote": 1000.0,
+        "paper_balance_quote": 10_000.0,
+    }
+    agent_id = client.post("/api/agents", json=payload, headers=auth_headers).json()["id"]
+    client.post(f"/api/agents/{agent_id}/run", headers=auth_headers)
+
+    # Equity history should have at least one point.
+    hist = client.get("/api/portfolio/history", headers=auth_headers)
+    assert hist.status_code == 200
+    assert len(hist.json()) >= 1
+    assert "equity" in hist.json()[0] and "t" in hist.json()[0]
+
+    # Per-agent equity curve.
+    eq = client.get(f"/api/agents/{agent_id}/equity", headers=auth_headers)
+    assert eq.status_code == 200 and len(eq.json()) >= 1
+
+    # Allocation and stats.
+    alloc = client.get("/api/portfolio/allocation", headers=auth_headers)
+    assert alloc.status_code == 200
+    stats = client.get("/api/portfolio/stats", headers=auth_headers)
+    assert stats.status_code == 200
+    assert stats.json()["agents"] >= 1
+
+
 def test_live_agent_requires_account(client, auth_headers):
     payload = {
         "name": "Live no account",
