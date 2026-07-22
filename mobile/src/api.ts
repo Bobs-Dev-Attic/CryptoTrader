@@ -221,6 +221,16 @@ export const api = {
   },
 
   me: () => request<User>("/api/auth/me"),
+  updateEmail: (new_email: string, current_password: string) =>
+    request<User>("/api/auth/email", {
+      method: "PATCH",
+      body: JSON.stringify({ new_email, current_password }),
+    }),
+  updatePassword: (current_password: string, new_password: string) =>
+    request<{ ok: boolean; detail: string }>("/api/auth/password", {
+      method: "PATCH",
+      body: JSON.stringify({ current_password, new_password }),
+    }),
 
   listAgents: () => request<Agent[]>("/api/agents"),
   getAgent: (id: number) => request<AgentDetail>(`/api/agents/${id}`),

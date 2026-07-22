@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import get_current_user
 from ..models import User
-from ..schemas import Token, UserCreate, UserOut
+from ..schemas import (
+    EmailUpdate,
+    PasswordUpdate,
+    Token,
+    UserCreate,
+    UserOut,
+)
 from ..security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -49,3 +55,43 @@ def login(
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)) -> UserOut:
     return UserOut.model_validate(user)
+
+
+@router.patch("/email", response_model=UserOut)
+def update_email(
+    payload: EmailUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserOut:
+    """Change the signed-in user's email (requires the current password)."""
+    if not verify_password(payload.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    taken = (
+        db.query(User)
+        .filter(User.email == payload.new_email, User.id != user.id)
+        .first()
+    )
+    if taken:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    user.email = payload.new_email
+    db.commit()
+    db.refresh(user)
+    return UserOut.model_validate(user)
+
+
+@router.patch("/password")
+def update_password(
+    payload: PasswordUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Change the signed-in user's password (requires the current password)."""
+    if not verify_password(payload.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    if payload.new_password == payload.current_password:
+        raise HTTPException(
+            status_code=400, detail="New password must differ from the current one"
+        )
+    user.hashed_password = hash_password(payload.new_password)
+    db.commit()
+    return {"ok": True, "detail": "Password updated"}

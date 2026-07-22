@@ -49,8 +49,7 @@ const ITEMS: { icon: string; label: string; path: string }[] = [
   { icon: "📊", label: "Dashboard", path: "/" },
   { icon: "🤖", label: "Agents", path: "/agents" },
   { icon: "🔑", label: "Exchanges", path: "/accounts" },
-  { icon: "＋", label: "New agent", path: "/agent/new" },
-  { icon: "🔗", label: "Connect an exchange", path: "/connect" },
+  { icon: "⚙️", label: "Account settings", path: "/settings" },
 ];
 
 /** The overlay panel. Render once near the app root, inside MenuProvider. */

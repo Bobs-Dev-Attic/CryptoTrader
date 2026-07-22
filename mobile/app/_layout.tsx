@@ -60,6 +60,10 @@ export default function RootLayout() {
                 name="account/[id]"
                 options={{ title: "Edit connection", headerLeft: () => <MenuButton /> }}
               />
+              <Stack.Screen
+                name="settings"
+                options={{ title: "Account settings", headerLeft: () => <MenuButton /> }}
+              />
             </Stack>
             <AppMenu />
             <VersionBadge />
