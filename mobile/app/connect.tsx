@@ -16,7 +16,11 @@ const HELP = {
   apiSecret:
     "The secret half of the API key — treat it like a password. It's encrypted on the server and never shown again. Never share it with anyone.",
   passphrase:
-    "An extra password some exchanges (like Coinbase Advanced) attach to an API key when you create it. Enter the same passphrase you set on the exchange.",
+    "An extra password some exchanges attach to an API key when you create it. Enter the same passphrase you set on the exchange.",
+  cdpName:
+    "Coinbase key-pair (CDP) keys: paste the 'name' value here — it looks like organizations/xxxx/apiKeys/yyyy.",
+  cdpPrivateKey:
+    "Paste the whole 'privateKey' value, including the -----BEGIN EC PRIVATE KEY----- and -----END EC PRIVATE KEY----- lines. Line breaks are fine.",
 };
 
 const STEPS = ["Exchange", "Get keys", "Credentials", "Connect"];
@@ -226,20 +230,36 @@ export default function ConnectWizard() {
               help={HELP.label}
             />
             <Field
-              label="API key"
+              label={selected.key_format === "cdp" ? "API key (name)" : "API key"}
               value={apiKey}
               onChangeText={setApiKey}
               autoCapitalize="none"
-              help={HELP.apiKey}
+              placeholder={selected.key_format === "cdp" ? "organizations/…/apiKeys/…" : undefined}
+              help={selected.key_format === "cdp" ? HELP.cdpName : HELP.apiKey}
             />
-            <Field
-              label="API secret"
-              value={apiSecret}
-              onChangeText={setApiSecret}
-              autoCapitalize="none"
-              secureTextEntry
-              help={HELP.apiSecret}
-            />
+            {selected.key_format === "cdp" ? (
+              <Field
+                label="Private key"
+                value={apiSecret}
+                onChangeText={setApiSecret}
+                autoCapitalize="none"
+                autoCorrect={false}
+                multiline
+                numberOfLines={5}
+                placeholder={"-----BEGIN EC PRIVATE KEY-----\n…\n-----END EC PRIVATE KEY-----"}
+                style={{ minHeight: 110, textAlignVertical: "top", fontFamily: "monospace" } as any}
+                help={HELP.cdpPrivateKey}
+              />
+            ) : (
+              <Field
+                label="API secret"
+                value={apiSecret}
+                onChangeText={setApiSecret}
+                autoCapitalize="none"
+                secureTextEntry
+                help={HELP.apiSecret}
+              />
+            )}
             {selected.needs_passphrase && (
               <Field
                 label="Passphrase"

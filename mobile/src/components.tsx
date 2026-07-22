@@ -101,6 +101,7 @@ export function Button({
 export function Field({
   label,
   help,
+  style,
   ...props
 }: { label: string; help?: string } & TextInputProps) {
   return (
@@ -108,7 +109,7 @@ export function Field({
       <InfoLabel label={label} help={help} />
       <TextInput
         placeholderTextColor={colors.textDim}
-        style={styles.input}
+        style={[styles.input, style]}
         {...props}
       />
     </View>
