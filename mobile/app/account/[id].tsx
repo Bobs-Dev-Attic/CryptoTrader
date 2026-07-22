@@ -34,8 +34,33 @@ export default function EditAccount() {
   const [passphrase, setPassphrase] = useState("");
 
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+
+  const runTest = async () => {
+    setError("");
+    setTestResult(null);
+    setTesting(true);
+    try {
+      // If the user typed new keys, test those; otherwise test the saved ones.
+      const result =
+        replaceKeys && (apiKey || apiSecret)
+          ? await api.validateAccount({
+              exchange: account?.exchange,
+              api_key: apiKey,
+              api_secret: apiSecret,
+              api_passphrase: passphrase,
+            })
+          : await api.testAccount(accountId);
+      setTestResult(result);
+    } catch (e: any) {
+      setTestResult({ ok: false, message: e?.message ?? "Test failed" });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -158,6 +183,32 @@ export default function EditAccount() {
                 secureTextEntry
               />
             )}
+          </View>
+        )}
+      </Card>
+
+      <Card>
+        <Text style={{ color: colors.textDim, marginBottom: spacing.sm, fontSize: 13 }}>
+          {replaceKeys && (apiKey || apiSecret)
+            ? "Tests the keys you entered above."
+            : "Tests this saved connection against the exchange."}
+        </Text>
+        <Button title={testing ? "Testing…" : "Test connection"} onPress={runTest} loading={testing} />
+        {testResult && (
+          <View
+            style={{
+              marginTop: spacing.md,
+              padding: spacing.md,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: testResult.ok ? colors.green : colors.red,
+              backgroundColor: colors.surfaceAlt,
+            }}
+          >
+            <Text style={{ color: testResult.ok ? colors.green : colors.red, fontWeight: "600" }}>
+              {testResult.ok ? "✓ OK" : "✗ Failed"}
+            </Text>
+            <Text style={{ color: colors.text, marginTop: spacing.xs }}>{testResult.message}</Text>
           </View>
         )}
       </Card>

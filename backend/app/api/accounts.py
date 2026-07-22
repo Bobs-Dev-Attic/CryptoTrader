@@ -16,39 +16,38 @@ from ..schemas import (
     ExchangeAccountValidate,
     ValidationResult,
 )
-from ..security import encrypt_secret
+from ..security import decrypt_secret, encrypt_secret
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
 
-@router.post("/validate", response_model=ValidationResult)
-def validate_credentials(
-    payload: ExchangeAccountValidate,
-    user: User = Depends(get_current_user),
+def _run_validation(
+    exchange: ExchangeId,
+    api_key: str,
+    api_secret: str,
+    api_passphrase: str,
 ) -> ValidationResult:
-    """Test exchange credentials without saving them (used by the setup wizard)."""
-    if payload.exchange == ExchangeId.ROBINHOOD:
+    """Shared credential test used by both /validate and /{id}/test."""
+    if exchange == ExchangeId.ROBINHOOD:
         return ValidationResult(
             ok=True,
             authenticated=False,
             message="Robinhood runs in paper mode in this build; no live keys needed.",
         )
 
-    if not payload.api_key or not payload.api_secret:
+    if not api_key or not api_secret:
         return ValidationResult(
             ok=True,
             authenticated=False,
             message="No credentials provided — this exchange can still be used for paper trading.",
         )
 
-    adapter = get_adapter(
-        payload.exchange, payload.api_key, payload.api_secret, payload.api_passphrase
-    )
+    adapter = get_adapter(exchange, api_key, api_secret, api_passphrase)
     try:
         balances = adapter.fetch_balance()
     except Exception as exc:
         msg = f"Could not authenticate: {type(exc).__name__}: {exc}"
-        if payload.exchange == ExchangeId.COINBASE and "base16" in str(exc).lower():
+        if exchange == ExchangeId.COINBASE and "base16" in str(exc).lower():
             msg = (
                 "Could not authenticate with this Coinbase key. Make sure you pasted "
                 "the full private key (including any BEGIN/END lines). Both ECDSA and "
@@ -60,6 +59,17 @@ def validate_credentials(
         authenticated=True,
         asset_count=len(balances),
         message=f"Connected. Found {len(balances)} funded asset(s). Ready for live trading.",
+    )
+
+
+@router.post("/validate", response_model=ValidationResult)
+def validate_credentials(
+    payload: ExchangeAccountValidate,
+    user: User = Depends(get_current_user),
+) -> ValidationResult:
+    """Test exchange credentials without saving them (used by the setup wizard)."""
+    return _run_validation(
+        payload.exchange, payload.api_key, payload.api_secret, payload.api_passphrase
     )
 
 
@@ -113,6 +123,22 @@ def get_account(
     db: Session = Depends(get_db),
 ) -> ExchangeAccountOut:
     return _to_out(_owned_account(db, user, account_id))
+
+
+@router.post("/{account_id}/test", response_model=ValidationResult)
+def test_account(
+    account_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ValidationResult:
+    """Test a saved connection using its stored (encrypted) credentials."""
+    acc = _owned_account(db, user, account_id)
+    return _run_validation(
+        ExchangeId(acc.exchange),
+        decrypt_secret(acc.api_key_enc),
+        decrypt_secret(acc.api_secret_enc),
+        decrypt_secret(acc.api_passphrase_enc),
+    )
 
 
 @router.patch("/{account_id}", response_model=ExchangeAccountOut)
