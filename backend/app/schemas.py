@@ -102,6 +102,7 @@ class AgentCreate(BaseModel):
     timeframe: str = "1h"
     strategy_type: StrategyType
     strategy_config: dict = Field(default_factory=dict)
+    risk_config: dict = Field(default_factory=dict)
     trade_mode: TradeMode = TradeMode.PAPER
     order_size_quote: float = 100.0
     paper_balance_quote: float = 10_000.0
@@ -114,6 +115,7 @@ class AgentUpdate(BaseModel):
     symbol: str | None = None
     timeframe: str | None = None
     strategy_config: dict | None = None
+    risk_config: dict | None = None
     trade_mode: TradeMode | None = None
     order_size_quote: float | None = None
     interval_seconds: int | None = None
@@ -137,6 +139,7 @@ class AgentOut(BaseModel):
     timeframe: str
     strategy_type: StrategyType
     strategy_config: dict
+    risk_config: dict = {}
     trade_mode: TradeMode
     order_size_quote: float
     paper_balance_quote: float

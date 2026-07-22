@@ -161,6 +161,9 @@ export default function AgentDetailScreen() {
               symbol: agent.symbol,
               timeframe: agent.timeframe,
               strategyType: agent.strategy_type,
+              // Raw configs so single-method strategies and risk overlays copy too.
+              strategy_config: cfg,
+              risk_config: agent.risk_config || {},
               useRsi: cfg.use_rsi ?? true,
               useMacd: cfg.use_macd ?? true,
               useMaCross: cfg.use_ma_cross ?? true,
