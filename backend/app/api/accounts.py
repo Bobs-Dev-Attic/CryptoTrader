@@ -8,6 +8,7 @@ from ..database import get_db
 from ..deps import get_current_user
 from ..enums import ExchangeId
 from ..exchanges import get_adapter
+from ..exchanges.ccxt_adapter import looks_like_ed25519_key
 from ..models import ExchangeAccount, User
 from ..schemas import (
     ExchangeAccountCreate,
@@ -40,17 +41,36 @@ def validate_credentials(
             message="No credentials provided — this exchange can still be used for paper trading.",
         )
 
+    # Coinbase Ed25519 keys can't be signed by our ECDSA-only client — catch this
+    # before the cryptic "Non-base16 digit found" error and tell the user the fix.
+    if payload.exchange == ExchangeId.COINBASE and looks_like_ed25519_key(
+        payload.api_secret
+    ):
+        return ValidationResult(
+            ok=False,
+            authenticated=False,
+            message=(
+                "This Coinbase key uses the Ed25519 algorithm, which isn't supported. "
+                "Create a new Secret API key in Coinbase and choose the ECDSA "
+                "algorithm (Trade + View), then use that key."
+            ),
+        )
+
     adapter = get_adapter(
         payload.exchange, payload.api_key, payload.api_secret, payload.api_passphrase
     )
     try:
         balances = adapter.fetch_balance()
     except Exception as exc:
-        return ValidationResult(
-            ok=False,
-            authenticated=False,
-            message=f"Could not authenticate: {type(exc).__name__}: {exc}",
-        )
+        msg = f"Could not authenticate: {type(exc).__name__}: {exc}"
+        if payload.exchange == ExchangeId.COINBASE and "base16" in str(exc).lower():
+            msg = (
+                "Could not authenticate. If your Coinbase key uses the Ed25519 "
+                "algorithm, create a new Secret API key with the ECDSA algorithm "
+                "instead. Otherwise, re-paste the full private key including the "
+                "BEGIN/END lines."
+            )
+        return ValidationResult(ok=False, authenticated=False, message=msg)
     return ValidationResult(
         ok=True,
         authenticated=True,
