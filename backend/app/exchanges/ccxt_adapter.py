@@ -3,6 +3,40 @@ from __future__ import annotations
 
 from .base import Candle, ExchangeAdapter, OrderResult, Ticker
 
+
+def normalize_secret(secret: str) -> str:
+    """Make an exchange API secret usable by ccxt.
+
+    Handles Coinbase Advanced / CDP EC private keys, which users paste in a few
+    shapes ccxt 4.4.x doesn't all accept:
+      * JSON-escaped newlines ("\\n") -> real newlines.
+      * PKCS#8 keys ("-----BEGIN PRIVATE KEY-----") -> SEC1
+        ("-----BEGIN EC PRIVATE KEY-----"), the only PEM header ccxt's ECDSA
+        signer recognizes (otherwise it hex-decodes the key and raises
+        "Non-base16 digit found").
+    Non-PEM secrets are returned unchanged.
+    """
+    if not secret:
+        return secret
+    s = secret
+    if "PRIVATE KEY" in s and "\\n" in s:
+        s = s.replace("\\n", "\n")
+    if "-----BEGIN PRIVATE KEY-----" in s:  # PKCS#8 -> SEC1
+        try:
+            from cryptography.hazmat.primitives import serialization
+
+            key = serialization.load_pem_private_key(s.encode(), password=None)
+            s = key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption(),
+            ).decode()
+        except Exception:
+            # Not an EC key (e.g. Ed25519) or unparseable — leave as-is so ccxt
+            # surfaces its own error.
+            pass
+    return s
+
 # Map our ExchangeId values to ccxt exchange class names.
 CCXT_EXCHANGE_MAP: dict[str, str] = {
     "kraken": "kraken",
@@ -46,13 +80,7 @@ class CcxtAdapter(ExchangeAdapter):
             if self.api_key:
                 params["apiKey"] = self.api_key
             if self.api_secret:
-                secret = self.api_secret
-                # Coinbase Advanced / CDP keys use an EC private key (PEM) as the
-                # secret. If pasted from JSON its newlines are escaped as "\n";
-                # crypto signing needs real newlines, so normalize them.
-                if "PRIVATE KEY" in secret and "\\n" in secret:
-                    secret = secret.replace("\\n", "\n")
-                params["secret"] = secret
+                params["secret"] = normalize_secret(self.api_secret)
             if self.api_passphrase:
                 params["password"] = self.api_passphrase
             client = klass(params)

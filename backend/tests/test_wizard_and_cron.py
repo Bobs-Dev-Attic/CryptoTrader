@@ -15,6 +15,28 @@ def test_exchanges_expose_wizard_metadata(client):
     assert by_id["kraken"]["docs_url"].startswith("http")
 
 
+def test_normalize_secret_pkcs8_to_sec1():
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    from app.exchanges.ccxt_adapter import normalize_secret
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    pkcs8 = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,  # -----BEGIN PRIVATE KEY-----
+        serialization.NoEncryption(),
+    ).decode()
+
+    # PKCS#8 is rewritten to the SEC1 header ccxt requires.
+    assert "BEGIN EC PRIVATE KEY" in normalize_secret(pkcs8)
+    # JSON-escaped newlines are also handled.
+    out = normalize_secret(pkcs8.replace("\n", "\\n"))
+    assert "BEGIN EC PRIVATE KEY" in out and "\\n" not in out
+    # Non-PEM secrets (HMAC keys) pass through untouched.
+    assert normalize_secret("plain-hmac-secret") == "plain-hmac-secret"
+
+
 def test_batch_tickers_endpoint(client, monkeypatch):
     from app.api import market as market_api
 
