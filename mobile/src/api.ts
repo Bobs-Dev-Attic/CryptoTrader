@@ -249,6 +249,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  testAccount: (id: number) =>
+    request<ValidationResult>(`/api/accounts/${id}/test`, { method: "POST" }),
   deleteAccount: (id: number) =>
     request<void>(`/api/accounts/${id}`, { method: "DELETE" }),
 
