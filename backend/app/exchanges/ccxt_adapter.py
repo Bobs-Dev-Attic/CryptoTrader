@@ -1,40 +1,61 @@
 """ccxt-backed adapter for Kraken, Binance, and Coinbase."""
 from __future__ import annotations
 
+import re
+
 from .base import Candle, ExchangeAdapter, OrderResult, Ticker
 
 
-def normalize_secret(secret: str) -> str:
-    """Make an exchange API secret usable by ccxt.
+def looks_like_ed25519_key(secret: str) -> bool:
+    """Heuristic: a Coinbase Ed25519 key is a ~88-char base64 string, no PEM.
 
-    Handles Coinbase Advanced / CDP EC private keys, which users paste in a few
-    shapes ccxt 4.4.x doesn't all accept:
-      * JSON-escaped newlines ("\\n") -> real newlines.
-      * PKCS#8 keys ("-----BEGIN PRIVATE KEY-----") -> SEC1
-        ("-----BEGIN EC PRIVATE KEY-----"), the only PEM header ccxt's ECDSA
-        signer recognizes (otherwise it hex-decodes the key and raises
-        "Non-base16 digit found").
-    Non-PEM secrets are returned unchanged.
+    ccxt 4.4.x signs Coinbase requests with ES256 (ECDSA) only, so Ed25519 keys
+    cannot be used and must be regenerated as ECDSA.
+    """
+    if not secret or "PRIVATE KEY" in secret:
+        return False
+    s = secret.strip()
+    return bool(re.fullmatch(r"[A-Za-z0-9+/]{80,120}={0,2}", s))
+
+
+def normalize_secret(secret: str) -> str:
+    """Make an exchange API secret usable by ccxt's Coinbase ECDSA signer.
+
+    Users paste Coinbase EC private keys in several shapes ccxt 4.4.x doesn't all
+    accept, so we:
+      * turn JSON-escaped newlines ("\\n") into real newlines;
+      * repair a PEM whose line breaks were stripped (e.g. by a single-line
+        input) by re-wrapping the base64 body at 64 columns;
+      * convert PKCS#8 ("-----BEGIN PRIVATE KEY-----") to SEC1
+        ("-----BEGIN EC PRIVATE KEY-----"), the only header ccxt's ECDSA signer
+        recognizes (otherwise it hex-decodes the key -> "Non-base16 digit found").
+    Non-PEM secrets (HMAC keys, or unsupported Ed25519 keys) pass through.
     """
     if not secret:
         return secret
     s = secret
     if "PRIVATE KEY" in s and "\\n" in s:
         s = s.replace("\\n", "\n")
-    if "-----BEGIN PRIVATE KEY-----" in s:  # PKCS#8 -> SEC1
-        try:
-            from cryptography.hazmat.primitives import serialization
 
-            key = serialization.load_pem_private_key(s.encode(), password=None)
-            s = key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.NoEncryption(),
-            ).decode()
-        except Exception:
-            # Not an EC key (e.g. Ed25519) or unparseable — leave as-is so ccxt
-            # surfaces its own error.
-            pass
+    # Rebuild a well-formed PEM from a BEGIN/END block even if newlines were lost.
+    m = re.search(r"-----BEGIN ([A-Z0-9 ]+?)-----(.*?)-----END \1-----", s, re.DOTALL)
+    if m:
+        label = m.group(1)
+        body = re.sub(r"\s+", "", m.group(2))
+        wrapped = "\n".join(body[i : i + 64] for i in range(0, len(body), 64))
+        s = f"-----BEGIN {label}-----\n{wrapped}\n-----END {label}-----\n"
+        if label == "PRIVATE KEY":  # PKCS#8 -> SEC1
+            try:
+                from cryptography.hazmat.primitives import serialization
+
+                key = serialization.load_pem_private_key(s.encode(), password=None)
+                s = key.private_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.TraditionalOpenSSL,
+                    encryption_algorithm=serialization.NoEncryption(),
+                ).decode()
+            except Exception:
+                pass  # not EC (e.g. Ed25519) — ccxt will surface its own error
     return s
 
 # Map our ExchangeId values to ccxt exchange class names.

@@ -36,6 +36,36 @@ def test_normalize_secret_pkcs8_to_sec1():
     # Non-PEM secrets (HMAC keys) pass through untouched.
     assert normalize_secret("plain-hmac-secret") == "plain-hmac-secret"
 
+    # A PKCS#8 PEM with its newlines stripped (single-line paste) is repaired.
+    mangled = pkcs8.replace("\n", " ")
+    assert "BEGIN EC PRIVATE KEY" in normalize_secret(mangled)
+
+
+def test_ed25519_key_detection():
+    import base64
+
+    from app.exchanges.ccxt_adapter import looks_like_ed25519_key
+
+    ed_b64 = base64.b64encode(b"\x01" * 64).decode()  # ~88-char base64, no PEM
+    assert looks_like_ed25519_key(ed_b64) is True
+    assert looks_like_ed25519_key("-----BEGIN EC PRIVATE KEY-----\nabc\n-----END EC PRIVATE KEY-----") is False
+    assert looks_like_ed25519_key("short") is False
+
+
+def test_validate_coinbase_ed25519_gives_guidance(client, auth_headers):
+    import base64
+
+    ed_b64 = base64.b64encode(b"\x02" * 64).decode()
+    resp = client.post(
+        "/api/accounts/validate",
+        json={"exchange": "coinbase", "api_key": "organizations/a/apiKeys/b", "api_secret": ed_b64},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is False
+    assert "ecdsa" in body["message"].lower()
+
 
 def test_batch_tickers_endpoint(client, monkeypatch):
     from app.api import market as market_api
