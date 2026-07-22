@@ -7,6 +7,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/auth";
 import { AppMenu, MenuButton, MenuProvider } from "@/menu";
 import { colors } from "@/theme";
+import { VersionBadge } from "@/VersionBadge";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -61,6 +62,7 @@ export default function RootLayout() {
               />
             </Stack>
             <AppMenu />
+            <VersionBadge />
           </AuthGate>
         </MenuProvider>
       </AuthProvider>
