@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "cd mobile && npm install",
-  "buildCommand": "cd mobile && npx expo export --platform web",
+  "buildCommand": "cd mobile && npx expo export --platform web --clear",
   "outputDirectory": "mobile/dist",
   "framework": null,
   "functions": {
@@ -12,5 +12,19 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+    },
+    {
+      "source": "/_expo/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    }
   ]
 }
