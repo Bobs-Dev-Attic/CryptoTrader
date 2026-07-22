@@ -46,6 +46,15 @@ class ExchangeAccountCreate(BaseModel):
     api_passphrase: str = ""
 
 
+class ExchangeAccountUpdate(BaseModel):
+    label: str | None = None
+    is_active: bool | None = None
+    # Provide any of these to replace stored credentials (leave unset to keep).
+    api_key: str | None = None
+    api_secret: str | None = None
+    api_passphrase: str | None = None
+
+
 class ExchangeAccountValidate(BaseModel):
     exchange: ExchangeId
     api_key: str = ""

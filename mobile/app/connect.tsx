@@ -70,6 +70,7 @@ export default function ConnectWizard() {
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -121,13 +122,56 @@ export default function ConnectWizard() {
         api_secret: apiSecret,
         api_passphrase: passphrase,
       });
-      router.back();
+      setSaved(true);
     } catch (e: any) {
       setError(e?.message ?? "Failed to save account");
     } finally {
       setSaving(false);
     }
   };
+
+  // Success confirmation after saving.
+  if (saved && selected) {
+    return (
+      <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
+        <Card style={{ borderColor: colors.green, alignItems: "center", paddingVertical: spacing.xl }}>
+          <View
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              backgroundColor: colors.green,
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: spacing.md,
+            }}
+          >
+            <Text style={{ color: "#fff", fontSize: 30, fontWeight: "800" }}>✓</Text>
+          </View>
+          <Text style={{ color: colors.text, fontSize: 18, fontWeight: "700" }}>Connection saved</Text>
+          <Text style={{ color: colors.textDim, textAlign: "center", marginTop: spacing.sm }}>
+            {label || selected.name} ({selected.name}) is now linked. You'll see it in your Exchanges
+            list, and you can pick it when setting a live agent's connection.
+          </Text>
+        </Card>
+        <Button title="Done" onPress={() => router.back()} />
+        <View style={{ height: spacing.md }} />
+        <Button
+          title="Connect another exchange"
+          variant="secondary"
+          onPress={() => {
+            setSaved(false);
+            setSelected(null);
+            setApiKey("");
+            setApiSecret("");
+            setPassphrase("");
+            setResult(null);
+            setStep(0);
+          }}
+        />
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>

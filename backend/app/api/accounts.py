@@ -8,11 +8,11 @@ from ..database import get_db
 from ..deps import get_current_user
 from ..enums import ExchangeId
 from ..exchanges import get_adapter
-from ..exchanges.ccxt_adapter import looks_like_ed25519_key
 from ..models import ExchangeAccount, User
 from ..schemas import (
     ExchangeAccountCreate,
     ExchangeAccountOut,
+    ExchangeAccountUpdate,
     ExchangeAccountValidate,
     ValidationResult,
 )
@@ -41,21 +41,6 @@ def validate_credentials(
             message="No credentials provided — this exchange can still be used for paper trading.",
         )
 
-    # Coinbase Ed25519 keys can't be signed by our ECDSA-only client — catch this
-    # before the cryptic "Non-base16 digit found" error and tell the user the fix.
-    if payload.exchange == ExchangeId.COINBASE and looks_like_ed25519_key(
-        payload.api_secret
-    ):
-        return ValidationResult(
-            ok=False,
-            authenticated=False,
-            message=(
-                "This Coinbase key uses the Ed25519 algorithm, which isn't supported. "
-                "Create a new Secret API key in Coinbase and choose the ECDSA "
-                "algorithm (Trade + View), then use that key."
-            ),
-        )
-
     adapter = get_adapter(
         payload.exchange, payload.api_key, payload.api_secret, payload.api_passphrase
     )
@@ -65,10 +50,9 @@ def validate_credentials(
         msg = f"Could not authenticate: {type(exc).__name__}: {exc}"
         if payload.exchange == ExchangeId.COINBASE and "base16" in str(exc).lower():
             msg = (
-                "Could not authenticate. If your Coinbase key uses the Ed25519 "
-                "algorithm, create a new Secret API key with the ECDSA algorithm "
-                "instead. Otherwise, re-paste the full private key including the "
-                "BEGIN/END lines."
+                "Could not authenticate with this Coinbase key. Make sure you pasted "
+                "the full private key (including any BEGIN/END lines). Both ECDSA and "
+                "Ed25519 Secret API keys are supported."
             )
         return ValidationResult(ok=False, authenticated=False, message=msg)
     return ValidationResult(
@@ -110,6 +94,47 @@ def create_account(
         api_passphrase_enc=encrypt_secret(payload.api_passphrase),
     )
     db.add(acc)
+    db.commit()
+    db.refresh(acc)
+    return _to_out(acc)
+
+
+def _owned_account(db: Session, user: User, account_id: int) -> ExchangeAccount:
+    acc = db.get(ExchangeAccount, account_id)
+    if not acc or acc.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return acc
+
+
+@router.get("/{account_id}", response_model=ExchangeAccountOut)
+def get_account(
+    account_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ExchangeAccountOut:
+    return _to_out(_owned_account(db, user, account_id))
+
+
+@router.patch("/{account_id}", response_model=ExchangeAccountOut)
+def update_account(
+    account_id: int,
+    payload: ExchangeAccountUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ExchangeAccountOut:
+    acc = _owned_account(db, user, account_id)
+    data = payload.model_dump(exclude_unset=True)
+    if "label" in data and data["label"] is not None:
+        acc.label = data["label"]
+    if "is_active" in data and data["is_active"] is not None:
+        acc.is_active = data["is_active"]
+    # Only overwrite credentials when a non-empty value is supplied.
+    if data.get("api_key"):
+        acc.api_key_enc = encrypt_secret(data["api_key"])
+    if data.get("api_secret"):
+        acc.api_secret_enc = encrypt_secret(data["api_secret"])
+    if data.get("api_passphrase") is not None:
+        acc.api_passphrase_enc = encrypt_secret(data["api_passphrase"])
     db.commit()
     db.refresh(acc)
     return _to_out(acc)

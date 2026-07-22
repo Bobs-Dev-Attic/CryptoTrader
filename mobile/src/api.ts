@@ -239,8 +239,11 @@ export const api = {
   strategies: () => request<StrategyMeta[]>("/api/agents/strategies", {}, false),
 
   listAccounts: () => request<ExchangeAccount[]>("/api/accounts"),
+  getAccount: (id: number) => request<ExchangeAccount>(`/api/accounts/${id}`),
   createAccount: (payload: Record<string, any>) =>
     request<ExchangeAccount>("/api/accounts", { method: "POST", body: JSON.stringify(payload) }),
+  updateAccount: (id: number, payload: Record<string, any>) =>
+    request<ExchangeAccount>(`/api/accounts/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   validateAccount: (payload: Record<string, any>) =>
     request<ValidationResult>("/api/accounts/validate", {
       method: "POST",

@@ -36,10 +36,10 @@ EXCHANGE_META: dict[str, dict] = {
         "permissions": ["Trade", "View"],
         "key_format": "cdp",
         "tip": (
-            "Create a Secret API key and choose the ECDSA algorithm (NOT Ed25519 — "
-            "it isn't supported). Paste the key 'name' (organizations/.../apiKeys/...) "
-            "as the API key, and the whole 'privateKey' as the API secret. No "
-            "passphrase. Grant Trade + View only — never Transfer."
+            "Create a Secret API key (ECDSA or Ed25519 both work). Paste the key "
+            "'name' (organizations/.../apiKeys/...) as the API key, and the whole "
+            "'privateKey' as the API secret. No passphrase. Grant Trade + View only "
+            "— never Transfer."
         ),
     },
     "robinhood": {
