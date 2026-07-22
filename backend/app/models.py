@@ -89,6 +89,10 @@ class Agent(Base):
     strategy_type: Mapped[StrategyType] = mapped_column(String(32))
     # Free-form strategy parameters (indicator thresholds, LLM prompt hints, etc.)
     strategy_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Risk & exit overlays applied by the runner around any strategy
+    # (stop-loss, take-profit, trailing stop, position sizing, drawdown kill,
+    # post-loss cooldown). Empty dict = overlays off.
+    risk_config: Mapped[dict] = mapped_column(JSON, default=dict)
 
     trade_mode: Mapped[TradeMode] = mapped_column(String(8), default=TradeMode.PAPER)
     # Notional amount (in quote currency) to deploy per BUY signal.
@@ -136,6 +140,8 @@ class Position(Base):
     cash_quote: Mapped[float] = mapped_column(Float, default=0.0)
     # Realized profit/loss accumulated over closed trades.
     realized_pnl: Mapped[float] = mapped_column(Float, default=0.0)
+    # Highest price seen since the current position was opened (for trailing stops).
+    high_water: Mapped[float] = mapped_column(Float, default=0.0)
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow

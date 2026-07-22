@@ -27,6 +27,14 @@ class StrategyContext:
         return [c.close for c in self.candles]
 
     @property
+    def highs(self) -> list[float]:
+        return [c.high for c in self.candles]
+
+    @property
+    def lows(self) -> list[float]:
+        return [c.low for c in self.candles]
+
+    @property
     def has_position(self) -> bool:
         return self.position_qty > 0
 

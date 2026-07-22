@@ -76,6 +76,54 @@ function Toggle({
   );
 }
 
+/** Renders a config form for a single-method strategy from its schema. */
+function GenericConfig({
+  meta,
+  values,
+  onChange,
+}: {
+  meta: StrategyMeta | null;
+  values: Record<string, any>;
+  onChange: (v: Record<string, any>) => void;
+}) {
+  if (!meta) return null;
+  return (
+    <View>
+      {meta.description ? <HelpNote>{meta.description}</HelpNote> : null}
+      {Object.entries(meta.config_schema).map(([key, p]) => {
+        const val = values[key] ?? p.default;
+        if (p.type === "bool") {
+          return (
+            <Toggle
+              key={key}
+              label={p.label || key}
+              help={p.help}
+              value={!!val}
+              onChange={(v) => onChange({ ...values, [key]: v })}
+            />
+          );
+        }
+        const numeric = p.type === "int" || p.type === "float";
+        return (
+          <Field
+            key={key}
+            label={p.label || key}
+            help={p.help}
+            value={String(val ?? "")}
+            keyboardType={numeric ? "numeric" : "default"}
+            onChangeText={(t) =>
+              onChange({
+                ...values,
+                [key]: numeric ? (p.type === "int" ? parseInt(t, 10) || 0 : parseFloat(t) || 0) : t,
+              })
+            }
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 /** Plain-language help strings for the New Agent form. */
 const HELP = {
   name: "A label for you to recognize this agent — e.g. 'BTC swing bot'. It has no effect on trading.",
@@ -117,6 +165,8 @@ const HELP = {
     "How often the agent checks the market and may trade, in seconds. 300 = every 5 minutes. Minimum is 30 seconds.",
   paperBalance:
     "The starting pretend cash for this paper agent, in the quote currency. Its profit/loss is measured against this.",
+  sizing:
+    "How much to spend per BUY. Fixed = always the Order size above. % of equity = a set fraction of current equity. ATR target = size so a volatility-based stop risks about your Risk % of equity.",
 };
 
 type PresetValues = {
@@ -124,7 +174,7 @@ type PresetValues = {
   exchange: string;
   symbol: string;
   timeframe: string;
-  strategyType: "rule_based" | "llm";
+  strategyType: string;
   useRsi: boolean;
   useMacd: boolean;
   useMaCross: boolean;
@@ -231,7 +281,7 @@ export default function NewAgent() {
   const [desiredExchange, setDesiredExchange] = useState("");
   const [symbol, setSymbol] = useState("BTC/USD");
   const [timeframe, setTimeframe] = useState("1h");
-  const [strategyType, setStrategyType] = useState<"rule_based" | "llm">("rule_based");
+  const [strategyType, setStrategyType] = useState<string>("rule_based");
   const [tradeMode, setTradeMode] = useState<"paper" | "live">("paper");
   const [orderSize, setOrderSize] = useState("100");
   const [paperBalance, setPaperBalance] = useState("10000");
@@ -246,6 +296,20 @@ export default function NewAgent() {
   const [maSlow, setMaSlow] = useState("50");
   // LLM config
   const [guidance, setGuidance] = useState("");
+  // Generic config for single-method technical strategies (rendered from schema).
+  const [genericCfg, setGenericCfg] = useState<Record<string, any>>({});
+  // Risk & exit overlays (percent inputs; converted to fractions on submit).
+  const [rk, setRk] = useState({
+    stopLoss: "0",
+    takeProfit: "0",
+    trailing: "0",
+    maxDd: "0",
+    cooldown: "0",
+    sizing: "fixed",
+    riskPct: "0",
+    atrPeriod: "14",
+    atrMult: "2",
+  });
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -293,6 +357,16 @@ export default function NewAgent() {
       applyValues({ ...BASE, ...parsed });
       if (parsed.accountId != null) setAccountId(Number(parsed.accountId));
       else if (parsed.exchange) setDesiredExchange(parsed.exchange);
+      if (parsed.risk_config) applyRisk(parsed.risk_config);
+      // For single-method strategies, carry the raw strategy_config forward.
+      if (
+        parsed.strategy_config &&
+        parsed.strategyType &&
+        parsed.strategyType !== "rule_based" &&
+        parsed.strategyType !== "llm"
+      ) {
+        setGenericCfg(parsed.strategy_config);
+      }
     } catch {
       /* ignore malformed prefill */
     }
@@ -322,6 +396,20 @@ export default function NewAgent() {
     if (match) setAccountId(match.id);
   }, [accounts, desiredExchange, accountId]);
 
+  const selectedStrategy = strategies.find((s) => s.type === strategyType) || null;
+  const isGeneric = strategyType !== "rule_based" && strategyType !== "llm";
+
+  // Selecting a single-method strategy seeds its config with schema defaults.
+  const selectStrategy = (type: string) => {
+    setStrategyType(type);
+    const meta = strategies.find((s) => s.type === type);
+    if (meta && type !== "rule_based" && type !== "llm") {
+      const defaults: Record<string, any> = {};
+      Object.entries(meta.config_schema).forEach(([k, p]) => (defaults[k] = p.default));
+      setGenericCfg(defaults);
+    }
+  };
+
   const strategyConfig = () =>
     strategyType === "rule_based"
       ? {
@@ -331,7 +419,41 @@ export default function NewAgent() {
           ma_fast: Number(maFast) || 20,
           ma_slow: Number(maSlow) || 50,
         }
-      : { guidance };
+      : strategyType === "llm"
+      ? { guidance }
+      : genericCfg;
+
+  // Percent inputs → fractions the backend expects (5 -> 0.05).
+  const buildRiskConfig = () => {
+    const frac = (v: string) => (Number(v) || 0) / 100;
+    return {
+      stop_loss_pct: frac(rk.stopLoss),
+      take_profit_pct: frac(rk.takeProfit),
+      trailing_stop_pct: frac(rk.trailing),
+      max_drawdown_pct: frac(rk.maxDd),
+      cooldown_seconds: Math.max(0, Math.floor(Number(rk.cooldown) || 0)),
+      sizing: rk.sizing,
+      risk_pct: frac(rk.riskPct),
+      atr_period: Math.max(1, Math.floor(Number(rk.atrPeriod) || 14)),
+      atr_mult: Number(rk.atrMult) || 2,
+    };
+  };
+
+  // Map a saved risk_config (fractions) back into the percent inputs (Save-As).
+  const applyRisk = (rc: Record<string, any>) => {
+    const pct = (v: any) => String(Math.round((Number(v) || 0) * 1000) / 10);
+    setRk({
+      stopLoss: pct(rc.stop_loss_pct),
+      takeProfit: pct(rc.take_profit_pct),
+      trailing: pct(rc.trailing_stop_pct),
+      maxDd: pct(rc.max_drawdown_pct),
+      cooldown: String(rc.cooldown_seconds ?? 0),
+      sizing: rc.sizing || "fixed",
+      riskPct: pct(rc.risk_pct),
+      atrPeriod: String(rc.atr_period ?? 14),
+      atrMult: String(rc.atr_mult ?? 2),
+    });
+  };
 
   const submit = async () => {
     setError("");
@@ -348,6 +470,7 @@ export default function NewAgent() {
         timeframe,
         strategy_type: strategyType,
         strategy_config: strategyConfig(),
+        risk_config: buildRiskConfig(),
         trade_mode: tradeMode,
         order_size_quote: Number(orderSize) || 100,
         paper_balance_quote: Number(paperBalance) || 10000,
@@ -464,11 +587,13 @@ export default function NewAgent() {
           label="Strategy"
           help={HELP.strategy}
           value={strategyType}
-          onChange={setStrategyType}
+          onChange={selectStrategy}
           options={strategies.map((s) => ({
-            value: s.type as any,
+            value: s.type,
             label: s.name,
-            help: s.type === "llm" ? HELP.strategyLlm : HELP.strategyRule,
+            help:
+              s.description ||
+              (s.type === "llm" ? HELP.strategyLlm : HELP.strategyRule),
           }))}
         />
         {strategyType === "rule_based" ? (
@@ -504,7 +629,7 @@ export default function NewAgent() {
               </View>
             )}
           </View>
-        ) : (
+        ) : strategyType === "llm" ? (
           <View>
             <HelpNote>
               Claude reads a snapshot of the market (recent prices and indicators) plus your guidance,
@@ -520,7 +645,73 @@ export default function NewAgent() {
               help={HELP.guidance}
             />
           </View>
+        ) : (
+          <GenericConfig meta={selectedStrategy} values={genericCfg} onChange={setGenericCfg} />
         )}
+      </Card>
+
+      {/* Risk & exit overlays (optional) — applied around any strategy. */}
+      <Card>
+        <InfoLabel
+          label="Risk & exits (optional)"
+          help="Guardrails applied around your strategy: how much to buy, when to force an exit, and when to stop trading. Leave at 0 / Fixed to disable."
+        />
+        <View style={{ height: spacing.sm }} />
+        <Pills
+          label="Position sizing"
+          help={HELP.sizing}
+          value={rk.sizing}
+          onChange={(v) => setRk({ ...rk, sizing: v })}
+          options={[
+            { value: "fixed", label: "Fixed", help: "Always buy the fixed Order size above." },
+            { value: "fixed_fractional", label: "% of equity", help: "Buy a fixed percent of current equity each time." },
+            { value: "atr_target", label: "ATR target", help: "Size so a stop of ATR×mult risks about Risk % of equity." },
+          ]}
+        />
+        {rk.sizing !== "fixed" && (
+          <Field
+            label="Risk % of equity per trade"
+            value={rk.riskPct}
+            onChangeText={(v) => setRk({ ...rk, riskPct: v })}
+            keyboardType="numeric"
+            help="e.g. 10 = deploy ~10% of equity per buy (or risk ~10% to the ATR stop)."
+          />
+        )}
+        {rk.sizing === "atr_target" && (
+          <View style={{ flexDirection: "row", gap: spacing.md }}>
+            <View style={{ flex: 1 }}>
+              <Field label="ATR period" value={rk.atrPeriod} onChangeText={(v) => setRk({ ...rk, atrPeriod: v })} keyboardType="numeric" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Field label="ATR ×" value={rk.atrMult} onChangeText={(v) => setRk({ ...rk, atrMult: v })} keyboardType="numeric" />
+            </View>
+          </View>
+        )}
+
+        <View style={{ height: spacing.sm }} />
+        <Text style={{ color: colors.textDim, fontSize: 12, marginBottom: spacing.xs }}>
+          Exits (percent; 0 = off)
+        </Text>
+        <View style={{ flexDirection: "row", gap: spacing.md }}>
+          <View style={{ flex: 1 }}>
+            <Field label="Stop-loss %" value={rk.stopLoss} onChangeText={(v) => setRk({ ...rk, stopLoss: v })} keyboardType="numeric" help="Sell if price falls this % below entry." />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Field label="Take-profit %" value={rk.takeProfit} onChangeText={(v) => setRk({ ...rk, takeProfit: v })} keyboardType="numeric" help="Sell if price rises this % above entry." />
+          </View>
+        </View>
+        <Field label="Trailing stop %" value={rk.trailing} onChangeText={(v) => setRk({ ...rk, trailing: v })} keyboardType="numeric" help="Sell if price falls this % below its peak since entry." />
+
+        <View style={{ height: spacing.sm }} />
+        <Text style={{ color: colors.textDim, fontSize: 12, marginBottom: spacing.xs }}>Safety (0 = off)</Text>
+        <View style={{ flexDirection: "row", gap: spacing.md }}>
+          <View style={{ flex: 1 }}>
+            <Field label="Max drawdown %" value={rk.maxDd} onChangeText={(v) => setRk({ ...rk, maxDd: v })} keyboardType="numeric" help="Liquidate and stop the agent if equity falls this % from its peak." />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Field label="Cooldown (sec)" value={rk.cooldown} onChangeText={(v) => setRk({ ...rk, cooldown: v })} keyboardType="numeric" help="After a losing trade, wait this long before buying again." />
+          </View>
+        </View>
       </Card>
 
       <Card>

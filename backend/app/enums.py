@@ -21,6 +21,13 @@ class TradeMode(str, enum.Enum):
 class StrategyType(str, enum.Enum):
     RULE_BASED = "rule_based"
     LLM = "llm"
+    # Additional single-method technical strategies.
+    DONCHIAN = "donchian"          # channel breakout (trend-following)
+    SUPERTREND = "supertrend"      # ATR trend-following
+    BOLLINGER = "bollinger"        # Bollinger Band mean-reversion
+    ZSCORE = "zscore"              # z-score mean-reversion
+    MOMENTUM = "momentum"          # rate-of-change momentum
+    ADX = "adx"                    # ADX/DI trend-strength filter
 
 
 class AgentStatus(str, enum.Enum):

@@ -22,7 +22,8 @@ from ..exchanges.base import OrderResult
 from ..exchanges.paper import Ledger, PaperBroker
 from ..models import Agent, EquitySnapshot, Position, Signal, Trade
 from ..security import decrypt_secret
-from .base import StrategyContext
+from . import risk
+from .base import StrategyContext, StrategyDecision
 from .registry import build_strategy
 
 logger = logging.getLogger("cryptotrader.runner")
@@ -78,6 +79,12 @@ def run_agent_once(db: Session, agent: Agent) -> Signal:
         return signal
 
     position = _get_or_create_position(db, agent)
+    risk_cfg = agent.risk_config or {}
+
+    # Track the running peak price while in a position (for trailing stops).
+    if position.quantity > 0:
+        position.high_water = max(position.high_water or 0.0, current_price)
+    equity_now = position.cash_quote + position.quantity * current_price
 
     # --- Strategy decision -------------------------------------------- #
     strategy = build_strategy(agent.strategy_type, agent.strategy_config or {})
@@ -93,6 +100,29 @@ def run_agent_once(db: Session, agent: Agent) -> Signal:
     )
     decision = strategy.decide(ctx)
 
+    # --- Risk & exit overlays (may override the strategy's decision) --- #
+    stop_after = False  # drawdown kill-switch: stop the agent after this tick
+    drawdown = risk.check_drawdown(db, agent, equity_now)
+    if drawdown:
+        stop_after = True
+        if position.quantity > 0:
+            decision = StrategyDecision(SignalAction.SELL, 1.0, f"Risk: {drawdown} — liquidating and stopping.")
+        else:
+            decision = StrategyDecision(SignalAction.HOLD, 0.0, f"Risk: {drawdown} — agent stopped.")
+    else:
+        forced = risk.check_exit(risk_cfg, position, current_price)
+        if forced:
+            decision = StrategyDecision(SignalAction.SELL, 1.0, f"Risk: {forced}.")
+        elif decision.action == SignalAction.BUY:
+            remaining = risk.cooldown_remaining(db, agent)
+            if remaining > 0:
+                decision = StrategyDecision(
+                    SignalAction.HOLD,
+                    decision.confidence,
+                    f"Cooldown after a losing trade — {remaining}s remaining.",
+                    decision.details,
+                )
+
     signal = Signal(
         agent_id=agent.id,
         action=decision.action,
@@ -107,7 +137,12 @@ def run_agent_once(db: Session, agent: Agent) -> Signal:
     # --- Execution ----------------------------------------------------- #
     if decision.action in (SignalAction.BUY, SignalAction.SELL):
         try:
-            self_execute(db, agent, position, decision.action, current_price, signal)
+            order_quote = (
+                risk.entry_notional(agent, equity_now, current_price, ctx.highs, ctx.lows, ctx.closes)
+                if decision.action == SignalAction.BUY
+                else agent.order_size_quote
+            )
+            self_execute(db, agent, position, decision.action, current_price, signal, order_quote)
             agent.status = AgentStatus.RUNNING
             agent.last_error = ""
         except NotImplementedError as exc:
@@ -121,6 +156,15 @@ def run_agent_once(db: Session, agent: Agent) -> Signal:
     else:
         agent.status = AgentStatus.RUNNING
         agent.last_error = ""
+
+    # Maintain the trailing-stop high-water mark and stop on a drawdown kill.
+    if position.quantity > 0:
+        position.high_water = max(position.high_water or 0.0, current_price)
+    else:
+        position.high_water = 0.0
+    if stop_after:
+        agent.status = AgentStatus.STOPPED
+        agent.last_error = drawdown
 
     # Record an equity snapshot for the equity curve (cash + position at mark).
     equity = position.cash_quote + position.quantity * current_price
@@ -144,10 +188,17 @@ def self_execute(
     action: SignalAction,
     price: float,
     signal: Signal,
+    order_quote: float | None = None,
 ) -> None:
-    """Execute a BUY or SELL for the agent in its configured trade mode."""
+    """Execute a BUY or SELL for the agent in its configured trade mode.
+
+    ``order_quote`` is the quote-currency notional to deploy on a BUY (defaults to
+    the agent's fixed ``order_size_quote``); risk-based position sizing passes a
+    computed value.
+    """
     result: OrderResult | None = None
     trade_realized = 0.0  # P&L booked by this order (sells that close a position)
+    buy_quote = agent.order_size_quote if order_quote is None else order_quote
 
     if agent.trade_mode == TradeMode.PAPER:
         broker = PaperBroker()
@@ -159,7 +210,7 @@ def self_execute(
             realized_pnl=position.realized_pnl,
         )
         if action == SignalAction.BUY:
-            result = broker.buy(ledger, agent.symbol, price, agent.order_size_quote)
+            result = broker.buy(ledger, agent.symbol, price, buy_quote)
         else:
             result = broker.sell_all(ledger, agent.symbol, price)
 
@@ -174,7 +225,7 @@ def self_execute(
     else:  # LIVE
         adapter = _live_adapter(agent)
         if action == SignalAction.BUY:
-            qty = agent.order_size_quote / price if price > 0 else 0.0
+            qty = buy_quote / price if price > 0 else 0.0
             result = adapter.create_market_order(agent.symbol, "buy", qty)
             # Track position from the fill (best-effort; live balances are source of truth).
             filled = result.quantity

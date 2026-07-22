@@ -1,8 +1,8 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useState } from "react";
-import { RefreshControl, ScrollView, Text, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 
-import { Agent, api } from "@/api";
+import { Agent, api, OptimizeResult } from "@/api";
 import { useAuth } from "@/auth";
 import { Donut, LineChart, Sparkline } from "@/charts";
 import { Badge, Button, Card } from "@/components";
@@ -138,6 +138,7 @@ export default function Dashboard() {
         <>
           <View style={{ height: spacing.sm }} />
           <PnlChart agents={agents} />
+          <AllocationSuggestion />
         </>
       )}
 
@@ -227,6 +228,81 @@ function PnlChart({ agents }: { agents: Agent[] }) {
           );
         })
       )}
+    </Card>
+  );
+}
+
+/** Advisory capital split across agents from their equity-curve history. */
+function AllocationSuggestion() {
+  const METHODS = [
+    { key: "risk_parity", label: "Risk parity" },
+    { key: "equal", label: "Equal" },
+    { key: "sharpe", label: "Sharpe" },
+  ];
+  const [method, setMethod] = useState("risk_parity");
+  const [data, setData] = useState<OptimizeResult | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    api
+      .portfolioOptimize(method)
+      .then((d) => alive && setData(d))
+      .catch(() => alive && setData(null));
+    return () => {
+      alive = false;
+    };
+  }, [method]);
+
+  if (!data || data.allocations.length === 0) return null;
+
+  return (
+    <Card>
+      <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: spacing.xs }}>
+        Suggested allocation
+      </Text>
+      <Text style={{ color: colors.textDim, fontSize: 12, marginBottom: spacing.sm }}>
+        Advisory only — a way to weight capital across agents from their equity history.
+      </Text>
+      <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md }}>
+        {METHODS.map((m) => (
+          <Pressable
+            key={m.key}
+            onPress={() => setMethod(m.key)}
+            style={{
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.xs,
+              borderRadius: radius.sm,
+              borderWidth: 1,
+              borderColor: method === m.key ? colors.primary : colors.border,
+              backgroundColor: method === m.key ? colors.primaryDim : colors.surfaceAlt,
+            }}
+          >
+            <Text style={{ color: colors.text, fontSize: 12 }}>{m.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {data.allocations.map((a) => (
+        <View key={a.agent_id} style={{ marginBottom: spacing.sm }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
+            <Text style={{ color: colors.textDim, fontSize: 12 }} numberOfLines={1}>
+              {a.name}
+            </Text>
+            <Text style={{ color: colors.text, fontSize: 12, fontWeight: "600" }}>
+              {Math.round(a.weight * 100)}% · ${a.suggested_quote.toFixed(0)}
+            </Text>
+          </View>
+          <View style={{ height: 8, backgroundColor: colors.surfaceAlt, borderRadius: 4, overflow: "hidden" }}>
+            <View
+              style={{
+                height: 8,
+                width: `${Math.max(a.weight * 100, 2)}%`,
+                backgroundColor: colors.primary,
+                borderRadius: 4,
+              }}
+            />
+          </View>
+        </View>
+      ))}
     </Card>
   );
 }

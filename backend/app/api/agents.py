@@ -84,6 +84,7 @@ def create_agent(
         timeframe=payload.timeframe,
         strategy_type=payload.strategy_type,
         strategy_config=payload.strategy_config,
+        risk_config=payload.risk_config,
         trade_mode=payload.trade_mode,
         order_size_quote=payload.order_size_quote,
         paper_balance_quote=payload.paper_balance_quote,

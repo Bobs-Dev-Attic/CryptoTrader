@@ -109,6 +109,7 @@ export interface Agent {
   timeframe: string;
   strategy_type: string;
   strategy_config: Record<string, any>;
+  risk_config: Record<string, any>;
   trade_mode: string;
   order_size_quote: number;
   paper_balance_quote: number;
@@ -156,10 +157,32 @@ export interface ExchangeAccount {
   created_at: string;
   has_credentials: boolean;
 }
+export interface StrategyParam {
+  type: string; // "bool" | "int" | "float" | "str"
+  default: any;
+  label?: string;
+  help?: string;
+}
 export interface StrategyMeta {
   type: string;
   name: string;
-  config_schema: Record<string, { type: string; default: any }>;
+  description?: string;
+  config_schema: Record<string, StrategyParam>;
+}
+export interface Allocation {
+  agent_id: number;
+  name: string;
+  symbol: string;
+  current_equity: number;
+  weight: number;
+  suggested_quote: number;
+  volatility: number;
+}
+export interface OptimizeResult {
+  method: string;
+  total: number;
+  allocations: Allocation[];
+  note: string;
 }
 export interface ExchangeMeta {
   id: string;
@@ -269,6 +292,8 @@ export const api = {
   portfolioAllocation: () =>
     request<{ label: string; value: number; symbol: string }[]>("/api/portfolio/allocation"),
   portfolioStats: () => request<Record<string, number>>("/api/portfolio/stats"),
+  portfolioOptimize: (method = "risk_parity") =>
+    request<OptimizeResult>(`/api/portfolio/optimize?method=${encodeURIComponent(method)}`),
   agentEquity: (id: number) =>
     request<{ t: string; equity: number }[]>(`/api/agents/${id}/equity`),
 

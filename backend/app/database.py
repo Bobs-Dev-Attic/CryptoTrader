@@ -45,3 +45,42 @@ def init_db() -> None:
     from . import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _ensure_columns()
+
+
+# Columns added after a table's initial creation. ``create_all`` only creates
+# missing *tables*, never missing *columns* on an existing one, so a long-lived
+# Postgres schema needs these lightweight, idempotent ALTERs to stay in sync
+# without a full migration tool. (table, column, postgres_ddl, sqlite_ddl)
+_ADDED_COLUMNS = [
+    (
+        "agents", "risk_config",
+        "ALTER TABLE agents ADD COLUMN IF NOT EXISTS risk_config JSONB NOT NULL DEFAULT '{}'::jsonb",
+        "ALTER TABLE agents ADD COLUMN risk_config JSON DEFAULT '{}'",
+    ),
+    (
+        "positions", "high_water",
+        "ALTER TABLE positions ADD COLUMN IF NOT EXISTS high_water DOUBLE PRECISION NOT NULL DEFAULT 0",
+        "ALTER TABLE positions ADD COLUMN high_water FLOAT DEFAULT 0",
+    ),
+]
+
+
+def _ensure_columns() -> None:
+    """Idempotently add newly-introduced columns to existing tables.
+
+    Each statement runs in its own transaction so one benign failure (e.g. the
+    column already exists on SQLite, which lacks ``ADD COLUMN IF NOT EXISTS``)
+    never aborts the others. Safe to run on every startup.
+    """
+    from sqlalchemy import text
+
+    is_pg = engine.dialect.name == "postgresql"
+    for _table, _col, pg_ddl, sqlite_ddl in _ADDED_COLUMNS:
+        ddl = pg_ddl if is_pg else sqlite_ddl
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(ddl))
+        except Exception:
+            # Column already exists or table not present yet — benign.
+            pass

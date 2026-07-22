@@ -64,6 +64,106 @@ def allocation(
     return slices
 
 
+def _returns(equities: list[float]) -> list[float]:
+    out: list[float] = []
+    for prev, cur in zip(equities, equities[1:]):
+        if prev > 0:
+            out.append((cur - prev) / prev)
+    return out
+
+
+def _stdev(xs: list[float]) -> float:
+    n = len(xs)
+    if n < 2:
+        return 0.0
+    mean = sum(xs) / n
+    return (sum((x - mean) ** 2 for x in xs) / n) ** 0.5
+
+
+@router.get("/optimize")
+def optimize(
+    method: str = "risk_parity",
+    total: float | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Suggest how to split capital across the user's agents.
+
+    Advisory only — it never moves funds. Weights are computed from each agent's
+    equity-curve history (no heavy deps; a lightweight take on risk-parity /
+    mean-variance that stays within our serverless limits):
+
+    - ``equal``        : 1/N across agents.
+    - ``risk_parity``  : weight ∝ 1/volatility (lower-vol agents get more).
+    - ``sharpe``       : weight ∝ max(mean_return / volatility, 0).
+    """
+    agents = db.query(Agent).filter(Agent.user_id == user.id).all()
+    rows: list[dict] = []
+    for a in agents:
+        snaps = (
+            db.query(EquitySnapshot)
+            .filter(EquitySnapshot.agent_id == a.id)
+            .order_by(EquitySnapshot.created_at.asc())
+            .all()
+        )
+        equities = [s.equity for s in snaps]
+        rets = _returns(equities)
+        vol = _stdev(rets)
+        mean = sum(rets) / len(rets) if rets else 0.0
+        cur_equity = equities[-1] if equities else (
+            (a.position.cash_quote + a.position.quantity * a.position.avg_entry_price)
+            if a.position else a.paper_balance_quote
+        )
+        rows.append({
+            "agent_id": a.id, "name": a.name, "symbol": a.symbol,
+            "current_equity": round(cur_equity, 2),
+            "vol": vol, "mean": mean,
+        })
+
+    if not rows:
+        return {"method": method, "total": 0.0, "allocations": [], "note": "No agents yet."}
+
+    # Raw (unnormalized) weights per method.
+    eps = 1e-9
+    if method == "equal":
+        raw = [1.0 for _ in rows]
+    elif method == "sharpe":
+        raw = [max(r["mean"] / (r["vol"] + eps), 0.0) for r in rows]
+        if not any(raw):  # no positive risk-adjusted returns yet → fall back to equal
+            raw = [1.0 for _ in rows]
+    else:  # risk_parity (inverse-volatility)
+        raw = [1.0 / (r["vol"] + eps) for r in rows]
+        # Agents without enough history (vol==0) shouldn't dominate; cap to the median.
+        finite = [w for w, r in zip(raw, rows) if r["vol"] > 0]
+        if finite:
+            cap = max(finite)
+            raw = [min(w, cap) for w in raw]
+
+    s = sum(raw) or 1.0
+    weights = [w / s for w in raw]
+    budget = total if total and total > 0 else sum(r["current_equity"] for r in rows)
+
+    allocations = [
+        {
+            "agent_id": r["agent_id"],
+            "name": r["name"],
+            "symbol": r["symbol"],
+            "current_equity": r["current_equity"],
+            "weight": round(w, 4),
+            "suggested_quote": round(budget * w, 2),
+            "volatility": round(r["vol"], 5),
+        }
+        for r, w in zip(rows, weights)
+    ]
+    allocations.sort(key=lambda x: x["weight"], reverse=True)
+    return {
+        "method": method,
+        "total": round(budget, 2),
+        "allocations": allocations,
+        "note": "Advisory suggestion based on each agent's equity-curve history.",
+    }
+
+
 @router.get("/stats")
 def stats(
     user: User = Depends(get_current_user), db: Session = Depends(get_db)
