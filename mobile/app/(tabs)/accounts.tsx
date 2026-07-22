@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { api, ExchangeAccount } from "@/api";
 import { Badge, Button, Card } from "@/components";
@@ -46,26 +46,23 @@ export default function AccountsScreen() {
       <View style={{ height: spacing.lg }} />
 
       {accounts.map((a) => (
-        <Pressable key={a.id} onPress={() => router.push(`/account/${a.id}`)}>
-          <Card>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.text, fontSize: 16, fontWeight: "600" }}>{a.label}</Text>
-                <Text style={{ color: colors.textDim, marginTop: 2 }}>
-                  {a.exchange.toUpperCase()}
-                  {!a.is_active ? " · disabled" : ""}
-                </Text>
-              </View>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-                <Badge
-                  label={a.has_credentials ? "keyed" : "paper only"}
-                  color={a.has_credentials ? colors.green : colors.textDim}
-                />
-                <Text style={{ color: colors.textDim, fontSize: 20 }}>›</Text>
-              </View>
+        <Card key={a.id}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.text, fontSize: 16, fontWeight: "600" }}>{a.label}</Text>
+              <Text style={{ color: colors.textDim, marginTop: 2 }}>
+                {a.exchange.toUpperCase()}
+                {!a.is_active ? " · disabled" : ""}
+              </Text>
             </View>
-          </Card>
-        </Pressable>
+            <Badge
+              label={a.has_credentials ? "keyed" : "paper only"}
+              color={a.has_credentials ? colors.green : colors.textDim}
+            />
+          </View>
+          <View style={{ height: spacing.md }} />
+          <Button title="Open / Edit" onPress={() => router.push(`/account/${a.id}`)} />
+        </Card>
       ))}
 
       {accounts.length === 0 && (

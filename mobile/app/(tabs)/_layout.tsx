@@ -2,6 +2,7 @@ import { Tabs } from "expo-router";
 import React from "react";
 import { Text } from "react-native";
 
+import { MenuButton } from "@/menu";
 import { colors } from "@/theme";
 
 function TabIcon({ icon, color }: { icon: string; color: string }) {
@@ -14,6 +15,7 @@ export default function TabsLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
+        headerLeft: () => <MenuButton />,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textDim,
