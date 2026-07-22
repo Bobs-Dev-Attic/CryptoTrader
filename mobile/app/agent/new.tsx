@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, Switch, Text, View } from "react-native";
 
 import { api, ExchangeAccount, ExchangeMeta, StrategyMeta } from "@/api";
@@ -109,7 +109,8 @@ const HELP = {
     "Simulated trading with pretend money and real live prices. Nothing real is bought or sold — the safe way to test a strategy.",
   live:
     "Places REAL orders with REAL money using your linked exchange API keys. Only use once you've tested in paper mode and understand the risk.",
-  account: "Which of your linked exchange keys this agent trades with in live mode.",
+  account:
+    "Which linked connection this agent trades through — this sets the exchange. Paper agents can use any connection (even keyless); live agents need one with API keys.",
   orderSize:
     "How much to spend on each BUY, in the quote currency (the part after the slash in the symbol). E.g. 100 on BTC/USD means $100 per buy.",
   interval:
@@ -226,7 +227,8 @@ export default function NewAgent() {
   const [accounts, setAccounts] = useState<ExchangeAccount[]>([]);
 
   const [name, setName] = useState("My BTC agent");
-  const [exchange, setExchange] = useState("kraken");
+  // Exchange is derived from the selected connection (below), not chosen directly.
+  const [desiredExchange, setDesiredExchange] = useState("");
   const [symbol, setSymbol] = useState("BTC/USD");
   const [timeframe, setTimeframe] = useState("1h");
   const [strategyType, setStrategyType] = useState<"rule_based" | "llm">("rule_based");
@@ -250,9 +252,15 @@ export default function NewAgent() {
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const params = useLocalSearchParams<{ prefill?: string }>();
 
+  // The chosen connection is the source of truth; the exchange follows from it.
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.id === accountId) ?? null,
+    [accounts, accountId]
+  );
+  const exchange = selectedAccount?.exchange ?? "";
+
   const applyValues = (v: PresetValues) => {
     setName(v.name);
-    setExchange(v.exchange);
     setSymbol(v.symbol);
     setTimeframe(v.timeframe);
     setStrategyType(v.strategyType);
@@ -270,6 +278,10 @@ export default function NewAgent() {
 
   const applyPreset = (p: Preset) => {
     applyValues(p.values);
+    // Pick a linked connection for the preset's exchange, if the user has one.
+    const match = accounts.find((a) => a.exchange === p.values.exchange);
+    setAccountId(match ? match.id : null);
+    setDesiredExchange(p.values.exchange);
     setActivePreset(p.key);
   };
 
@@ -279,6 +291,8 @@ export default function NewAgent() {
     try {
       const parsed = JSON.parse(params.prefill);
       applyValues({ ...BASE, ...parsed });
+      if (parsed.accountId != null) setAccountId(Number(parsed.accountId));
+      else if (parsed.exchange) setDesiredExchange(parsed.exchange);
     } catch {
       /* ignore malformed prefill */
     }
@@ -298,6 +312,16 @@ export default function NewAgent() {
     })();
   }, []);
 
+  // Auto-select a connection when none is chosen: prefer the desired exchange
+  // (from a preset / Save-As), else the first linked connection.
+  useEffect(() => {
+    if (accountId != null || accounts.length === 0) return;
+    const match = desiredExchange
+      ? accounts.find((a) => a.exchange === desiredExchange)
+      : accounts[0];
+    if (match) setAccountId(match.id);
+  }, [accounts, desiredExchange, accountId]);
+
   const strategyConfig = () =>
     strategyType === "rule_based"
       ? {
@@ -309,10 +333,12 @@ export default function NewAgent() {
         }
       : { guidance };
 
-  const matchingAccounts = accounts.filter((a) => a.exchange === exchange);
-
   const submit = async () => {
     setError("");
+    if (!accountId || !exchange) {
+      setError("Pick a connection first (or connect an exchange).");
+      return;
+    }
     setBusy(true);
     try {
       await api.createAgent({
@@ -389,14 +415,27 @@ export default function NewAgent() {
         …or configure everything yourself below.
       </Text>
 
+      {accounts.length === 0 && (
+        <Card style={{ borderColor: colors.yellow }}>
+          <Text style={{ color: colors.text, marginBottom: spacing.md }}>
+            An agent trades through one of your linked connections. Connect an exchange first — a
+            keyless connection works for paper trading.
+          </Text>
+          <Button title="Connect an exchange" onPress={() => router.push("/connect")} />
+        </Card>
+      )}
+
       <Card>
         <Field label="Name" value={name} onChangeText={setName} help={HELP.name} />
         <Pills
-          label="Exchange"
-          help={HELP.exchange}
-          value={exchange}
-          onChange={setExchange}
-          options={exchanges.map((e) => ({ value: e.id, label: e.name }))}
+          label="Connection"
+          help={HELP.account}
+          value={accountId ? String(accountId) : ""}
+          onChange={(v) => setAccountId(Number(v))}
+          options={accounts.map((a) => ({
+            value: String(a.id),
+            label: `${a.label} · ${a.exchange.toUpperCase()}`,
+          }))}
         />
         <Field
           label="Symbol"
@@ -495,28 +534,15 @@ export default function NewAgent() {
             { value: "live", label: "Live (real money)", help: HELP.live },
           ]}
         />
-        {/* Connection association — which linked account this agent uses. */}
-        <Pills
-          label="Connection"
-          help={HELP.account}
-          value={accountId ? String(accountId) : "none"}
-          onChange={(v) => setAccountId(v === "none" ? null : Number(v))}
-          options={[
-            { value: "none", label: tradeMode === "live" ? "Select…" : "None (paper)" },
-            ...matchingAccounts.map((a) => ({ value: String(a.id), label: a.label })),
-          ]}
-        />
-        {matchingAccounts.length === 0 && (
-          <Pressable onPress={() => router.push("/connect")}>
-            <Text style={{ color: colors.primary, marginBottom: spacing.md }}>
-              + Connect a {exchange.toUpperCase()} account
-            </Text>
-          </Pressable>
-        )}
         {tradeMode === "live" && (
           <Text style={{ color: colors.yellow, marginBottom: spacing.md }}>
-            ⚠ Live mode executes real orders using the selected connection. Choose a keyed{" "}
-            {exchange.toUpperCase()} connection.
+            ⚠ Live mode executes real orders through{" "}
+            <Text style={{ fontWeight: "700" }}>
+              {selectedAccount ? selectedAccount.label : "the selected connection"}
+            </Text>
+            {selectedAccount && !selectedAccount.has_credentials
+              ? " — this connection has no API keys, so live trading will fail. Add keys under Exchanges."
+              : ". Make sure it has trade permissions."}
           </Text>
         )}
         <View style={{ flexDirection: "row", gap: spacing.md }}>
@@ -551,7 +577,7 @@ export default function NewAgent() {
       </Card>
 
       {error ? <Text style={{ color: colors.red, marginBottom: spacing.md }}>{error}</Text> : null}
-      <Button title="Create agent" onPress={submit} loading={busy} />
+      <Button title="Create agent" onPress={submit} loading={busy} disabled={!accountId} />
       <View style={{ height: spacing.xl }} />
     </ScrollView>
   );

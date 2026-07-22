@@ -172,6 +172,7 @@ export default function AgentDetailScreen() {
               orderSize: String(agent.order_size_quote),
               interval: String(agent.interval_seconds),
               paperBalance: String(agent.paper_balance_quote),
+              accountId: agent.account_id,
             };
             router.push({ pathname: "/agent/new", params: { prefill: JSON.stringify(prefill) } });
           }}
