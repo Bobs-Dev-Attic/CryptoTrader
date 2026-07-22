@@ -35,6 +35,16 @@ class Token(BaseModel):
     user: UserOut
 
 
+class EmailUpdate(BaseModel):
+    new_email: EmailStr
+    current_password: str
+
+
+class PasswordUpdate(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
+
+
 # --------------------------------------------------------------------------- #
 # Exchange accounts
 # --------------------------------------------------------------------------- #

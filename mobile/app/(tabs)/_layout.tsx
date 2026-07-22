@@ -16,9 +16,9 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
         headerLeft: () => <MenuButton />,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textDim,
+        // Navigation is handled by the global hamburger menu, so the bottom tab
+        // bar is hidden. These screens remain a Tabs navigator only for routing.
+        tabBarStyle: { display: "none" },
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
