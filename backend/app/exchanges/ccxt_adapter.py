@@ -46,7 +46,13 @@ class CcxtAdapter(ExchangeAdapter):
             if self.api_key:
                 params["apiKey"] = self.api_key
             if self.api_secret:
-                params["secret"] = self.api_secret
+                secret = self.api_secret
+                # Coinbase Advanced / CDP keys use an EC private key (PEM) as the
+                # secret. If pasted from JSON its newlines are escaped as "\n";
+                # crypto signing needs real newlines, so normalize them.
+                if "PRIVATE KEY" in secret and "\\n" in secret:
+                    secret = secret.replace("\\n", "\n")
+                params["secret"] = secret
             if self.api_passphrase:
                 params["password"] = self.api_passphrase
             client = klass(params)

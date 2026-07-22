@@ -30,11 +30,17 @@ EXCHANGE_META: dict[str, dict] = {
     },
     "coinbase": {
         "name": "Coinbase",
-        "needs_passphrase": True,
-        "docs_url": "https://help.coinbase.com/en/coinbase/trading-and-funding/advanced-trade-api",
+        "needs_passphrase": False,
+        "docs_url": "https://docs.cdp.coinbase.com/advanced-trade/docs/auth",
         "sample_symbol": "BTC/USD",
-        "permissions": ["trade", "view"],
-        "tip": "Coinbase Advanced keys include a passphrase. Never grant transfer/withdraw.",
+        "permissions": ["Trade", "View"],
+        "key_format": "cdp",
+        "tip": (
+            "Coinbase now uses key-pair (CDP) keys. Paste the key 'name' "
+            "(organizations/.../apiKeys/...) as the API key, and the whole "
+            "'privateKey' (-----BEGIN EC PRIVATE KEY----- ... block) as the API "
+            "secret. No passphrase. Grant Trade + View only — never Transfer."
+        ),
     },
     "robinhood": {
         "name": "Robinhood",
@@ -62,6 +68,7 @@ def list_exchanges() -> list[dict]:
                 "sample_symbol": meta.get("sample_symbol", "BTC/USD"),
                 "permissions": meta.get("permissions", []),
                 "tip": meta.get("tip", ""),
+                "key_format": meta.get("key_format", "key_secret"),
             }
         )
     return result

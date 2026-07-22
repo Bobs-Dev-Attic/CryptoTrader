@@ -170,6 +170,7 @@ export interface ExchangeMeta {
   sample_symbol: string;
   permissions: string[];
   tip: string;
+  key_format?: string; // "key_secret" (default) or "cdp" (Coinbase key-pair)
 }
 export interface ValidationResult {
   ok: boolean;

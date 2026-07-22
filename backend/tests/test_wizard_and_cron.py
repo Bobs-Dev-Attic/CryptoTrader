@@ -6,8 +6,9 @@ def test_exchanges_expose_wizard_metadata(client):
     resp = client.get("/api/market/exchanges")
     assert resp.status_code == 200
     by_id = {e["id"]: e for e in resp.json()}
-    # Coinbase needs a passphrase; Kraken does not.
-    assert by_id["coinbase"]["needs_passphrase"] is True
+    # Coinbase now uses key-pair (CDP) keys — no passphrase.
+    assert by_id["coinbase"]["needs_passphrase"] is False
+    assert by_id["coinbase"]["key_format"] == "cdp"
     assert by_id["kraken"]["needs_passphrase"] is False
     # Robinhood is paper-only.
     assert by_id["robinhood"]["supports_live"] is False
