@@ -52,19 +52,44 @@ def test_ed25519_key_detection():
     assert looks_like_ed25519_key("short") is False
 
 
-def test_validate_coinbase_ed25519_gives_guidance(client, auth_headers):
-    import base64
+def test_validate_coinbase_base16_error_is_friendly(client, auth_headers, monkeypatch):
+    from app.api import accounts as accounts_api
 
-    ed_b64 = base64.b64encode(b"\x02" * 64).decode()
+    class BadAdapter:
+        def fetch_balance(self):
+            raise Exception("Error: Non-base16 digit found")
+
+    monkeypatch.setattr(accounts_api, "get_adapter", lambda *a, **k: BadAdapter())
     resp = client.post(
         "/api/accounts/validate",
-        json={"exchange": "coinbase", "api_key": "organizations/a/apiKeys/b", "api_secret": ed_b64},
+        json={"exchange": "coinbase", "api_key": "organizations/a/apiKeys/b", "api_secret": "x" * 88},
         headers=auth_headers,
     )
     assert resp.status_code == 200
     body = resp.json()
     assert body["ok"] is False
-    assert "ecdsa" in body["message"].lower()
+    assert "coinbase" in body["message"].lower()
+
+
+def test_ed25519_jwt_signature_verifies():
+    import base64
+    import json
+
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from app.exchanges.coinbase_ed25519 import ed25519_jwt
+
+    k = Ed25519PrivateKey.generate()
+    secret = base64.b64encode(k.private_bytes_raw() + k.public_key().public_bytes_raw()).decode()
+    token = ed25519_jwt({"sub": "kid", "iss": "coinbase-cloud"}, secret, "kid", "nonce123")
+    h, p, s = token.split(".")
+
+    def unb64url(x):
+        return base64.urlsafe_b64decode(x + "=" * (-len(x) % 4))
+
+    assert json.loads(unb64url(h))["alg"] == "EdDSA"
+    # Signature must verify against the key's public half.
+    k.public_key().verify(unb64url(s), f"{h}.{p}".encode())
 
 
 def test_batch_tickers_endpoint(client, monkeypatch):

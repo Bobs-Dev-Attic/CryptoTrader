@@ -104,7 +104,16 @@ class CcxtAdapter(ExchangeAdapter):
                 params["secret"] = normalize_secret(self.api_secret)
             if self.api_passphrase:
                 params["password"] = self.api_passphrase
-            client = klass(params)
+
+            # Coinbase Ed25519 keys need EdDSA JWT signing, which stock ccxt
+            # (ES256 only) can't do — use our subclass for those.
+            if self.exchange_id == "coinbase" and looks_like_ed25519_key(self.api_secret):
+                from .coinbase_ed25519 import make_coinbase_ed25519
+
+                params["secret"] = self.api_secret  # raw base64, not PEM
+                client = make_coinbase_ed25519(params)
+            else:
+                client = klass(params)
             if self.sandbox and client.has.get("sandbox"):
                 client.set_sandbox_mode(True)
             self._client = client

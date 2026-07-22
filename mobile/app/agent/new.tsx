@@ -326,7 +326,7 @@ export default function NewAgent() {
         order_size_quote: Number(orderSize) || 100,
         paper_balance_quote: Number(paperBalance) || 10000,
         interval_seconds: Number(interval) || 300,
-        account_id: tradeMode === "live" ? accountId : null,
+        account_id: accountId,
       } as any);
       router.back();
     } catch (e: any) {
@@ -495,24 +495,29 @@ export default function NewAgent() {
             { value: "live", label: "Live (real money)", help: HELP.live },
           ]}
         />
-        {tradeMode === "live" && (
-          <>
-            <Text style={{ color: colors.yellow, marginBottom: spacing.md }}>
-              ⚠ Live mode executes real orders. Link a keyed account for {exchange.toUpperCase()}.
+        {/* Connection association — which linked account this agent uses. */}
+        <Pills
+          label="Connection"
+          help={HELP.account}
+          value={accountId ? String(accountId) : "none"}
+          onChange={(v) => setAccountId(v === "none" ? null : Number(v))}
+          options={[
+            { value: "none", label: tradeMode === "live" ? "Select…" : "None (paper)" },
+            ...matchingAccounts.map((a) => ({ value: String(a.id), label: a.label })),
+          ]}
+        />
+        {matchingAccounts.length === 0 && (
+          <Pressable onPress={() => router.push("/connect")}>
+            <Text style={{ color: colors.primary, marginBottom: spacing.md }}>
+              + Connect a {exchange.toUpperCase()} account
             </Text>
-            <Pills
-              label="Account"
-              help={HELP.account}
-              value={accountId ? String(accountId) : ""}
-              onChange={(v) => setAccountId(Number(v))}
-              options={matchingAccounts.map((a) => ({ value: String(a.id), label: a.label }))}
-            />
-            {matchingAccounts.length === 0 && (
-              <Text style={{ color: colors.textDim, marginBottom: spacing.md }}>
-                No {exchange.toUpperCase()} account linked. Add one under Exchanges.
-              </Text>
-            )}
-          </>
+          </Pressable>
+        )}
+        {tradeMode === "live" && (
+          <Text style={{ color: colors.yellow, marginBottom: spacing.md }}>
+            ⚠ Live mode executes real orders using the selected connection. Choose a keyed{" "}
+            {exchange.toUpperCase()} connection.
+          </Text>
         )}
         <View style={{ flexDirection: "row", gap: spacing.md }}>
           <View style={{ flex: 1 }}>
