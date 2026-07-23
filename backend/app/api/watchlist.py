@@ -91,8 +91,38 @@ def evaluate_watches(db: Session) -> int:
             w.triggered = now_triggered
             if now_triggered and not was:
                 w.last_triggered_at = now
+                _notify(db, w, value)
             checked += 1
         except Exception:
             continue
     db.commit()
     return checked
+
+
+_METRIC_LABEL = {
+    "range_24h": "24h range",
+    "change_24h": "24h move",
+    "volume": "volume",
+    "ret_vol": "return volatility",
+    "atr_pct": "ATR",
+}
+
+
+def _notify(db: Session, watch: VolatilityWatch, value: float) -> None:
+    """Best-effort Web Push when a watch crosses its threshold (never raises)."""
+    try:
+        from ..push import send_push
+
+        label = _METRIC_LABEL.get(watch.metric, watch.metric)
+        unit = "" if watch.metric == "volume" else "%"
+        send_push(
+            db,
+            watch.user_id,
+            {
+                "title": f"{watch.symbol} volatility alert",
+                "body": f"{label} reached {value:.1f}{unit} (≥ {watch.threshold:g}{unit})",
+                "url": "/alerts",
+            },
+        )
+    except Exception:
+        pass

@@ -186,6 +186,34 @@ class EquitySnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, index=True)
 
 
+class PushConfig(Base):
+    """Singleton row holding the server's VAPID keypair for Web Push.
+
+    Auto-generated on first use so no manual key configuration is needed.
+    """
+
+    __tablename__ = "push_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # base64url raw private scalar (what pywebpush expects) + public app-server key.
+    vapid_private: Mapped[str] = mapped_column(Text)
+    vapid_public: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
+class PushSubscription(Base):
+    """A browser Web Push subscription belonging to a user."""
+
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    endpoint: Mapped[str] = mapped_column(Text)
+    keys_p256dh: Mapped[str] = mapped_column(Text, default="")
+    keys_auth: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
 class VolatilityWatch(Base):
     """A user's alert on a coin's volatility metric crossing a threshold.
 

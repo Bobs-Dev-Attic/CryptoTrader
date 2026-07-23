@@ -15,6 +15,7 @@ APScheduler==3.11.0
 psycopg2-binary==2.9.10
 anthropic==0.42.0
 httpx==0.28.1
+pywebpush==1.14.1
 
 # dev / test
 pytest==8.3.4
