@@ -41,17 +41,25 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
-    """Create all tables. Import models so they register on Base.metadata."""
+    """Bring the schema up to date via Alembic (self-applies on startup).
+
+    Imports models first so they register on ``Base.metadata`` (the baseline
+    migration and the adoption backfill both read from it).
+    """
     from . import models  # noqa: F401
+    from .migrations_runtime import run_migrations
 
-    Base.metadata.create_all(bind=engine)
-    _ensure_columns()
+    run_migrations()
 
 
-# Columns added after a table's initial creation. ``create_all`` only creates
-# missing *tables*, never missing *columns* on an existing one, so a long-lived
-# Postgres schema needs these lightweight, idempotent ALTERs to stay in sync
-# without a full migration tool. (table, column, postgres_ddl, sqlite_ddl)
+# --- Legacy column backfill (pre-Alembic) --------------------------------
+# Retained only for *adopting* a database that predates Alembic: on first boot
+# under the new system we run this once to guarantee every column exists, then
+# stamp the baseline (see migrations_runtime.run_migrations). Do NOT add new
+# entries here — schema changes now go through Alembic migrations.
+#
+# ``create_all`` only creates missing *tables*, never missing *columns* on an
+# existing one. (table, column, postgres_ddl, sqlite_ddl)
 _ADDED_COLUMNS = [
     (
         "users", "token_version",
