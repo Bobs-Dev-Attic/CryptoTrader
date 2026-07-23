@@ -2,7 +2,7 @@
   "expo": {
     "name": "CryptoTrader",
     "slug": "cryptotrader",
-    "version": "0.6.6",
+    "version": "0.6.7",
     "orientation": "portrait",
     "scheme": "cryptotrader",
     "userInterfaceStyle": "automatic",

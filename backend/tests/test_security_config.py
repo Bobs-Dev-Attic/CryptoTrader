@@ -26,6 +26,38 @@ def test_is_production_only_when_explicit():
     assert Settings(environment="PROD").is_production is True
 
 
+def test_safe_config_defaults():
+    s = Settings()
+    assert s.debug is False
+    assert s.cors_origin_list != ["*"]  # no wildcard by default
+    assert s.config_warnings() == []
+
+
+def test_config_warnings_flag_debug_and_wildcard():
+    s = Settings(debug=True, cors_origins="*")
+    warnings = s.config_warnings()
+    assert any("DEBUG" in w for w in warnings)
+    assert any("CORS" in w for w in warnings)
+
+
+def test_validation_error_message_is_generic(monkeypatch):
+    """A failed credential test must not leak the raw exception to the client."""
+    from app.api import accounts
+    from app.enums import ExchangeId
+
+    secret_marker = "sk_live_LEAKED_KEY_material_1234"
+
+    class _Boom:
+        def fetch_balance(self):
+            raise RuntimeError(f"ccxt AuthenticationError: {secret_marker}")
+
+    monkeypatch.setattr(accounts, "get_adapter", lambda *a, **k: _Boom())
+    result = accounts._run_validation(ExchangeId.KRAKEN, "key", "secret", "")
+    assert result.ok is False and result.authenticated is False
+    assert secret_marker not in result.message
+    assert "RuntimeError" not in result.message  # exception type not leaked either
+
+
 def test_roundtrip_with_derived_key():
     token = security.encrypt_secret("super-secret-api-key")
     assert token and token != "super-secret-api-key"
