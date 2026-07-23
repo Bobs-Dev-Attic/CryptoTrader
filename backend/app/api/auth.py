@@ -1,13 +1,14 @@
 """Authentication routes: register + login."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import get_current_user
 from ..models import User
+from ..ratelimit import enforce as rate_limit
 from ..schemas import (
     EmailUpdate,
     PasswordUpdate,
@@ -21,7 +22,8 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
-def register(payload: UserCreate, db: Session = Depends(get_db)) -> Token:
+def register(payload: UserCreate, request: Request, db: Session = Depends(get_db)) -> Token:
+    rate_limit(request, db, "register", limit=10, window_seconds=3600)  # 10/hour/IP
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -38,9 +40,11 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> Token:
 
 @router.post("/login", response_model=Token)
 def login(
+    request: Request,
     form: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ) -> Token:
+    rate_limit(request, db, "login", limit=10, window_seconds=60)  # 10/min/IP
     # OAuth2PasswordRequestForm uses "username"; we treat it as the email.
     user = db.query(User).filter(User.email == form.username).first()
     if not user or not verify_password(form.password, user.hashed_password):

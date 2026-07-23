@@ -49,8 +49,11 @@ def _run_tick() -> dict:
             if not due:
                 continue
             try:
-                run_agent_once(db, agent)
-                evaluated.append(agent.id)
+                # respect_interval re-checks due-ness under the per-agent lock,
+                # so overlapping ticks can't double-run (returns None if skipped).
+                sig = run_agent_once(db, agent, respect_interval=True)
+                if sig is not None:
+                    evaluated.append(agent.id)
             except Exception:
                 db.rollback()
         # Evaluate volatility alert watches (never lets a failure break the tick).

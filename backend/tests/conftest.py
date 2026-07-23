@@ -7,6 +7,9 @@ _TMP = tempfile.mkdtemp(prefix="cryptotrader-test-")
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{_TMP}/test.db")
 os.environ.setdefault("SCHEDULER_ENABLED", "false")
 os.environ.setdefault("JWT_SECRET", "test-secret")
+# The suite registers many users from one client IP; disable the limiter here
+# (its behavior is covered directly in test_ratelimit.py).
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

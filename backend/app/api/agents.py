@@ -223,4 +223,9 @@ def run_now(
 ) -> Signal:
     """Evaluate the agent immediately (one tick), regardless of schedule."""
     agent = _owned_agent(db, user, agent_id)
-    return run_agent_once(db, agent)
+    signal = run_agent_once(db, agent)
+    if signal is None:
+        raise HTTPException(
+            status_code=409, detail="Agent is already being evaluated — try again in a moment."
+        )
+    return signal

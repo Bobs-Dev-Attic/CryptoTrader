@@ -31,6 +31,7 @@ class FakeStatsAdapter(ExchangeAdapter):
 
 @pytest.fixture
 def patch_scan(monkeypatch):
+    marketscan._SCAN_CACHE.clear()  # avoid cross-test cache bleed
     monkeypatch.setattr(marketscan, "get_adapter", lambda *a, **k: FakeStatsAdapter())
 
 

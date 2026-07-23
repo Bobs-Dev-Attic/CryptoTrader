@@ -186,6 +186,20 @@ class EquitySnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, index=True)
 
 
+class RateLimit(Base):
+    """A fixed-window counter row for the DB-backed rate limiter.
+
+    Keyed by ``bucket`` = "<name>:<ip>:<window_start>"; approximate counting is
+    fine for a safety valve. Rows expire and are cleaned up opportunistically.
+    """
+
+    __tablename__ = "rate_limits"
+
+    bucket: Mapped[str] = mapped_column(String(200), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+
+
 class PushConfig(Base):
     """Singleton row holding the server's VAPID keypair for Web Push.
 
