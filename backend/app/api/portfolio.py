@@ -1,7 +1,10 @@
 """Portfolio-level analytics: equity curve, allocation, and summary stats."""
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -16,27 +19,60 @@ MAX_POINTS = 500
 
 @router.get("/history")
 def equity_history(
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    days: int | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> list[dict]:
     """Total portfolio equity over time.
 
     Combines per-agent snapshots into a portfolio series: at each snapshot event
     we update that agent's latest equity and emit the sum across all agents.
+
+    ``days`` optionally windows the series to the last N days. We select only the
+    three scalar columns we need (not full ORM rows) to keep memory bounded, and
+    seed each agent's carry-in equity from its last snapshot *before* the window
+    so the portfolio total stays correct at the left edge.
     """
     agent_ids = [a.id for a in db.query(Agent).filter(Agent.user_id == user.id).all()]
     if not agent_ids:
         return []
-    snaps = (
-        db.query(EquitySnapshot)
-        .filter(EquitySnapshot.agent_id.in_(agent_ids))
-        .order_by(EquitySnapshot.created_at.asc())
-        .all()
-    )
+
     latest: dict[int, float] = {}
+    q = db.query(
+        EquitySnapshot.agent_id, EquitySnapshot.equity, EquitySnapshot.created_at
+    ).filter(EquitySnapshot.agent_id.in_(agent_ids))
+
+    if days and days > 0:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).replace(tzinfo=None)
+        # Carry-in: each agent's most recent equity strictly before the window.
+        sub = (
+            db.query(
+                EquitySnapshot.agent_id.label("aid"),
+                func.max(EquitySnapshot.created_at).label("mx"),
+            )
+            .filter(
+                EquitySnapshot.agent_id.in_(agent_ids),
+                EquitySnapshot.created_at < cutoff,
+            )
+            .group_by(EquitySnapshot.agent_id)
+            .subquery()
+        )
+        for aid, eq in (
+            db.query(EquitySnapshot.agent_id, EquitySnapshot.equity)
+            .join(
+                sub,
+                (EquitySnapshot.agent_id == sub.c.aid)
+                & (EquitySnapshot.created_at == sub.c.mx),
+            )
+            .all()
+        ):
+            latest[aid] = eq
+        q = q.filter(EquitySnapshot.created_at >= cutoff)
+
     points: list[dict] = []
-    for s in snaps:
-        latest[s.agent_id] = s.equity
-        points.append({"t": s.created_at.isoformat(), "equity": round(sum(latest.values()), 2)})
+    for agent_id, equity, created_at in q.order_by(EquitySnapshot.created_at.asc()).all():
+        latest[agent_id] = equity
+        points.append({"t": created_at.isoformat(), "equity": round(sum(latest.values()), 2)})
     # Downsample to keep the payload small while preserving the shape.
     if len(points) > MAX_POINTS:
         step = len(points) / MAX_POINTS
@@ -100,13 +136,16 @@ def optimize(
     agents = db.query(Agent).filter(Agent.user_id == user.id).all()
     rows: list[dict] = []
     for a in agents:
-        snaps = (
-            db.query(EquitySnapshot)
+        # Only the equity column, and only the most recent MAX_POINTS points —
+        # enough for a volatility/return estimate without loading full history.
+        recent = (
+            db.query(EquitySnapshot.equity)
             .filter(EquitySnapshot.agent_id == a.id)
-            .order_by(EquitySnapshot.created_at.asc())
+            .order_by(EquitySnapshot.created_at.desc())
+            .limit(MAX_POINTS)
             .all()
         )
-        equities = [s.equity for s in snaps]
+        equities = [r[0] for r in reversed(recent)]  # back to oldest-first
         rets = _returns(equities)
         vol = _stdev(rets)
         mean = sum(rets) / len(rets) if rets else 0.0
@@ -185,23 +224,27 @@ def stats(
             with_pnl += 1
             if a.position.realized_pnl > 0:
                 profitable += 1
-    # Win/loss stats from position-closing sell trades.
+    # Win/loss stats from position-closing sell trades. Aggregated in SQL with
+    # conditional sums (portable across Postgres/SQLite) so we never pull the
+    # full — and unbounded — trade history into memory.
     agent_ids = [a.id for a in agents]
     wins = losses = 0
     win_sum = loss_sum = 0.0
     if agent_ids:
-        sells = (
-            db.query(Trade)
+        row = (
+            db.query(
+                func.sum(case((Trade.realized_pnl > 0, 1), else_=0)),
+                func.sum(case((Trade.realized_pnl > 0, Trade.realized_pnl), else_=0.0)),
+                func.sum(case((Trade.realized_pnl < 0, 1), else_=0)),
+                func.sum(case((Trade.realized_pnl < 0, Trade.realized_pnl), else_=0.0)),
+            )
             .filter(Trade.agent_id.in_(agent_ids), Trade.side == OrderSide.SELL)
-            .all()
+            .one()
         )
-        for t in sells:
-            if t.realized_pnl > 0:
-                wins += 1
-                win_sum += t.realized_pnl
-            elif t.realized_pnl < 0:
-                losses += 1
-                loss_sum += t.realized_pnl
+        wins = int(row[0] or 0)
+        win_sum = float(row[1] or 0.0)
+        losses = int(row[2] or 0)
+        loss_sum = float(row[3] or 0.0)
     closed = wins + losses
     return {
         "agents": len(agents),
