@@ -76,6 +76,63 @@ function Toggle({
   );
 }
 
+/** A small chip (e.g. category / difficulty) shown on the strategy info panel. */
+function Chip({ text, color }: { text: string; color: string }) {
+  return (
+    <View
+      style={{
+        borderWidth: 1,
+        borderColor: color,
+        borderRadius: radius.sm,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 2,
+      }}
+    >
+      <Text style={{ color, fontSize: 11, fontWeight: "700" }}>{text}</Text>
+    </View>
+  );
+}
+
+/** "When to use this" context panel for the selected strategy. */
+function StrategyInfo({ meta }: { meta: StrategyMeta | null }) {
+  if (!meta || (!meta.best_for && !meta.avoid_when && !meta.kind)) return null;
+  const diffColor =
+    meta.difficulty === "Advanced"
+      ? colors.red
+      : meta.difficulty === "Intermediate"
+      ? colors.yellow
+      : colors.green;
+  return (
+    <View
+      style={{
+        backgroundColor: colors.surfaceAlt,
+        borderRadius: radius.sm,
+        borderWidth: 1,
+        borderColor: colors.border,
+        padding: spacing.md,
+        marginBottom: spacing.md,
+      }}
+    >
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.sm }}>
+        {meta.kind ? <Chip text={meta.kind} color={colors.primary} /> : null}
+        {meta.difficulty ? <Chip text={meta.difficulty} color={diffColor} /> : null}
+      </View>
+      {meta.best_for ? (
+        <View style={{ flexDirection: "row", marginBottom: spacing.xs }}>
+          <Text style={{ color: colors.green, fontSize: 12, fontWeight: "700", width: 78 }}>Best for</Text>
+          <Text style={{ color: colors.text, fontSize: 12, lineHeight: 17, flex: 1 }}>{meta.best_for}</Text>
+        </View>
+      ) : null}
+      {meta.avoid_when ? (
+        <View style={{ flexDirection: "row" }}>
+          <Text style={{ color: colors.red, fontSize: 12, fontWeight: "700", width: 78 }}>Avoid when</Text>
+          <Text style={{ color: colors.text, fontSize: 12, lineHeight: 17, flex: 1 }}>{meta.avoid_when}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 /** Renders a config form for a single-method strategy from its schema. */
 function GenericConfig({
   meta,
@@ -596,6 +653,7 @@ export default function NewAgent() {
               (s.type === "llm" ? HELP.strategyLlm : HELP.strategyRule),
           }))}
         />
+        <StrategyInfo meta={selectedStrategy} />
         {strategyType === "rule_based" ? (
           <View>
             <HelpNote>

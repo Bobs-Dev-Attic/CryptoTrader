@@ -70,8 +70,12 @@ def test_all_new_strategies_return_valid_action():
 
 
 def test_available_strategies_lists_all_types():
-    types = {s["type"] for s in available_strategies()}
+    strategies = available_strategies()
+    types = {s["type"] for s in strategies}
     assert {"rule_based", "llm", "donchian", "supertrend", "bollinger", "zscore", "momentum", "adx"} <= types
+    # Every strategy carries decision-support context for the picker.
+    for s in strategies:
+        assert s.get("kind") and s.get("best_for") and s.get("avoid_when") and s.get("difficulty")
 
 
 # --- Risk overlays (pure helpers) ---------------------------------------- #
