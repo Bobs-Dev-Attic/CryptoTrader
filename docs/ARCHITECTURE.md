@@ -109,11 +109,10 @@ the full file map and `../TODO.md` / `REVIEW.md` for the current critique.
 | Alerts | `api/watchlist.py`, `VolatilityWatch` | Threshold watches evaluated each tick (rising-edge triggered state). |
 | Push | `push.py`, `api/push.py`, `mobile/public/sw.js` | Web Push (auto-generated VAPID) + a foreground notifier fallback. |
 | Serverless cron | `api/internal.py` | pg_cron `POST /api/internal/tick` runs due agents **and** evaluates alert watches. |
-| Schema self-heal | `database.py::_ensure_columns` | Idempotent `ALTER … ADD COLUMN IF NOT EXISTS` so column additions need no manual migration (no Alembic yet — see TODO). |
+| Schema migrations | `migrations/`, `migrations_runtime.run_migrations` | Alembic, self-applied on startup (serverless has no migration step). New DB upgrades from zero; the pre-Alembic prod DB is adopted in place (backfill + stamp baseline). Add changes via `alembic revision --autogenerate`. |
 
 ## Roadmap ideas
 
 - WebSocket push for live position/price updates (replace polling).
 - Offline backtesting harness reusing the same `Strategy` interface.
-- Alembic migrations to replace `create_all` + `_ensure_columns`.
 - The security & compliance hardening tracked in `../TODO.md` (P0/P1).

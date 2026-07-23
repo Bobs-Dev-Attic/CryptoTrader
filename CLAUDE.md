@@ -44,13 +44,20 @@ docs/           ARCHITECTURE.md, DEPLOYMENT.md
   assume you can read/migrate prod from here. Schema changes must self-apply
   (see below).
 
-## Schema changes (no Alembic)
-`init_db()` runs on every startup: `create_all()` (creates missing **tables**)
-plus `_ensure_columns()` — idempotent `ALTER TABLE … ADD COLUMN IF NOT EXISTS`
-for columns added to **existing** tables (create_all never adds columns). So:
-- New table → just define the model; `create_all` makes it on next deploy.
-- New column on an existing table → add the model field **and** an entry in
-  `database.py::_ADDED_COLUMNS` (postgres + sqlite DDL). Otherwise prod 500s.
+## Schema changes (Alembic, self-applying on startup)
+Alembic owns the schema. `init_db()` → `migrations_runtime.run_migrations()`
+runs on every startup (serverless has no separate migration step): a new DB
+`upgrade`s from zero; a legacy DB with no `alembic_version` is **adopted in
+place** (backfill via the retained `_ensure_columns`, then *stamp* the baseline
+— never re-create). Migrations live in `backend/migrations/versions/`; `env.py`
+uses the app's own engine + `Base.metadata`. To change the schema:
+- New table or column → edit the model, then generate a migration:
+  `cd backend && alembic revision --autogenerate -m "..."`, review the emitted
+  `op.*` (batch mode covers SQLite ALTERs), commit it. It self-applies on the
+  next deploy. **Do NOT** add to `database.py::_ADDED_COLUMNS` — that list is
+  frozen, kept only for adopting the pre-Alembic prod DB.
+- The baseline (`0001_baseline`) is a `create_all` of the whole model set;
+  `alembic revision --autogenerate` should report no drift against `main`.
 
 ## Commands (run from the right dir — the shell keeps cwd between calls)
 ```

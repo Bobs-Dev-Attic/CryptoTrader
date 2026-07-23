@@ -75,9 +75,15 @@ The rationale behind each item is in [`docs/REVIEW.md`](./docs/REVIEW.md).
 - [x] **Continuous integration.** ✅ Done (#33). `.github/workflows/ci.yml`
   runs `pytest` (backend) and `tsc --noEmit` + `expo export` (frontend) on every
   PR and push to `main`. **[high][S][engineering]**
-- [ ] **Real migrations.** Replace `create_all` + hand-maintained
-  `_ADDED_COLUMNS` with **Alembic**; the current scheme silently drifts and has
-  no down-path or history. **[high][M][engineering]**
+- [x] **Real migrations.** ✅ Done (#39). **Alembic** now owns the schema.
+  `migrations/` holds a create_all-based baseline (`0001_baseline`, autogenerate
+  confirms zero drift vs. the models) and `env.py` wired to the app's engine +
+  metadata. `migrations_runtime.run_migrations()` self-applies on startup (no
+  serverless migration step): a brand-new DB upgrades from zero; the existing
+  prod DB — built by the old path, so no `alembic_version` — is **adopted in
+  place** (backfill columns once, then *stamp* the baseline, never re-create),
+  preserving all data. Future schema changes are real migrations, not
+  `_ADDED_COLUMNS` entries. **[high][M][engineering]**
 
 ## P2 — hardening & polish
 

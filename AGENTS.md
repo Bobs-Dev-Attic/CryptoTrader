@@ -25,9 +25,9 @@ PRs are **squash-merged**, so re-base the branch on `origin/main`
 `--force-with-lease`; verify the Vercel prod deploy is READY after merge.
 
 ## Traps that cause prod 500s or wasted cycles
-- **Schema**: `create_all` makes new *tables* but not new *columns*. Adding a
-  column to an existing table requires an entry in
-  `backend/app/database.py::_ADDED_COLUMNS` (self-applied ALTER on startup).
+- **Schema**: Alembic owns it and self-applies on startup. Change a model, then
+  `cd backend && alembic revision --autogenerate -m "..."` and commit the file.
+  Do NOT touch `_ADDED_COLUMNS` (frozen; only adopts the pre-Alembic prod DB).
 - The MCP-visible Supabase project is **not** the runtime DB; migrations must
   self-apply, not be run by hand.
 - Vercel **Deployment Protection** gates the app — you cannot probe endpoints
