@@ -4,7 +4,7 @@ import { Alert, Platform, ScrollView, Switch, Text, useWindowDimensions, View } 
 
 import { api, ExchangeAccount, ExchangeMeta } from "@/api";
 import { Button, Card, Field } from "@/components";
-import { colors, spacing } from "@/theme";
+import { colors, spacing, screenContent } from "@/theme";
 
 function confirm(message: string, onYes: () => void) {
   if (Platform.OS === "web") {
@@ -199,7 +199,7 @@ export default function EditAccount() {
   );
 
   return (
-    <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
+    <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={screenContent}>
       {/* Top row of actions */}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.md }}>
         <View style={{ flex: 1, minWidth: 120 }}>

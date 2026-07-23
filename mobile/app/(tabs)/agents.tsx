@@ -3,8 +3,8 @@ import React, { useCallback, useState } from "react";
 import { RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { Agent, api } from "@/api";
-import { Badge, Button, Card } from "@/components";
-import { colors, pnlColor, spacing } from "@/theme";
+import { Badge, Button, Card, CardGrid } from "@/components";
+import { colors, pnlColor, spacing, screenContent } from "@/theme";
 
 export default function AgentsScreen() {
   const router = useRouter();
@@ -34,13 +34,14 @@ export default function AgentsScreen() {
   return (
     <ScrollView
       style={{ backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: spacing.lg }}
+      contentContainerStyle={screenContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
       <Button title="+ New agent" onPress={() => router.push("/agent/new")} />
       <View style={{ height: spacing.lg }} />
 
-      {agents.map((a) => {
+      <CardGrid>
+        {agents.map((a) => {
         const pnl = a.position?.realized_pnl ?? 0;
         return (
           <Card key={a.id} style={{ marginBottom: spacing.md }}>
@@ -66,7 +67,8 @@ export default function AgentsScreen() {
             <Button title="Open" variant="secondary" onPress={() => router.push(`/agent/${a.id}`)} />
           </Card>
         );
-      })}
+        })}
+      </CardGrid>
 
       {agents.length === 0 && (
         <Text style={{ color: colors.textDim, textAlign: "center", marginTop: spacing.xl }}>

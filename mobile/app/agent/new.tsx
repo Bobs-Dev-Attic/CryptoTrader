@@ -4,7 +4,7 @@ import { Pressable, ScrollView, Switch, Text, View } from "react-native";
 
 import { api, ExchangeAccount, ExchangeMeta, StrategyMeta } from "@/api";
 import { Button, Card, Field, HelpNote, InfoLabel } from "@/components";
-import { colors, radius, spacing } from "@/theme";
+import { colors, radius, spacing, screenContent } from "@/theme";
 
 type PillOption<T> = { value: T; label: string; help?: string };
 
@@ -543,7 +543,7 @@ export default function NewAgent() {
   };
 
   return (
-    <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
+    <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={screenContent}>
       <HelpNote>
         An <Text style={{ fontWeight: "700" }}>agent</Text> is an automated bot that watches one market
         and follows a strategy you choose to decide when to buy and sell. New agents trade in{" "}

@@ -33,3 +33,15 @@ export function pnlColor(value: number): string {
   if (value < 0) return colors.red;
   return colors.textDim;
 }
+
+/**
+ * Centered, max-width content container. Keeps pages from stretching edge-to-edge
+ * on wide (desktop web) screens while staying full-width on phones. Use as a
+ * ScrollView's contentContainerStyle.
+ */
+export const screenContent = {
+  padding: spacing.lg,
+  width: "100%",
+  maxWidth: 980,
+  alignSelf: "center",
+} as const;

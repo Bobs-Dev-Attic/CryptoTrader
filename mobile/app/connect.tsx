@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-nati
 
 import { api, ExchangeMeta, ValidationResult } from "@/api";
 import { Badge, Button, Card, Field, HelpNote } from "@/components";
-import { colors, radius, spacing } from "@/theme";
+import { colors, radius, spacing, screenContent } from "@/theme";
 
 /** Plain-language help for the connection wizard fields. */
 const HELP = {
@@ -133,7 +133,7 @@ export default function ConnectWizard() {
   // Success confirmation after saving.
   if (saved && selected) {
     return (
-      <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
+      <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={screenContent}>
         <Card style={{ borderColor: colors.green, alignItems: "center", paddingVertical: spacing.xl }}>
           <View
             style={{
@@ -174,7 +174,7 @@ export default function ConnectWizard() {
   }
 
   return (
-    <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
+    <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={screenContent}>
       <Stepper step={step} />
 
       {/* Step 0 — choose exchange */}

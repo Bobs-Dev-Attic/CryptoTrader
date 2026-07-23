@@ -4,7 +4,7 @@ import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native"
 
 import { api, Watch } from "@/api";
 import { Badge, Button, Card, Field } from "@/components";
-import { colors, radius, spacing } from "@/theme";
+import { colors, radius, spacing, screenContent } from "@/theme";
 
 const EXCHANGES = ["kraken", "binance", "coinbase"];
 const METRICS = [
@@ -118,7 +118,7 @@ export default function Alerts() {
   return (
     <ScrollView
       style={{ backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: spacing.lg }}
+      contentContainerStyle={screenContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
       <Text style={{ color: colors.textDim, marginBottom: spacing.md, fontSize: 13 }}>

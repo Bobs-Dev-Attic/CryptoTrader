@@ -3,8 +3,8 @@ import React, { useCallback, useRef, useState } from "react";
 import { Platform, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { api, VolRow } from "@/api";
-import { Card } from "@/components";
-import { colors, pnlColor, radius, spacing } from "@/theme";
+import { Card, CardGrid } from "@/components";
+import { colors, pnlColor, radius, spacing, screenContent } from "@/theme";
 
 const EXCHANGES = ["kraken", "binance", "coinbase"];
 const METRICS = [
@@ -136,7 +136,7 @@ export default function Movers() {
   return (
     <ScrollView
       style={{ backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: spacing.lg }}
+      contentContainerStyle={screenContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
       <Text style={{ color: colors.textDim, marginBottom: spacing.md, fontSize: 13 }}>
@@ -164,7 +164,8 @@ export default function Movers() {
           Couldn't load market data. Pull to refresh.
         </Text>
       ) : (
-        rows.map((row, i) => {
+        <CardGrid>
+        {rows.map((row, i) => {
           const v = metricValue(row, metric);
           const signed = metric === "change_24h" && v != null;
           return (
@@ -194,7 +195,8 @@ export default function Movers() {
               </View>
             </Card>
           );
-        })
+        })}
+        </CardGrid>
       )}
       <View style={{ height: spacing.xl }} />
     </ScrollView>

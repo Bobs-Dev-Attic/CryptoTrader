@@ -4,7 +4,7 @@ import { ScrollView, Text, View } from "react-native";
 import { api } from "@/api";
 import { useAuth } from "@/auth";
 import { Button, Card, Field } from "@/components";
-import { colors, spacing } from "@/theme";
+import { colors, spacing, screenContent } from "@/theme";
 
 export default function SettingsScreen() {
   const { user, refresh } = useAuth();
@@ -64,7 +64,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
+    <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={screenContent}>
       <Card>
         <Text style={{ color: colors.text, fontWeight: "700", marginBottom: spacing.xs }}>Signed in as</Text>
         <Text style={{ color: colors.textDim }}>{user?.email ?? "—"}</Text>

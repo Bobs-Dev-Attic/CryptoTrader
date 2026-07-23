@@ -10,7 +10,7 @@ import { Alert, Platform, RefreshControl, ScrollView, Text, View } from "react-n
 import { AgentDetail, api } from "@/api";
 import { LineChart } from "@/charts";
 import { Badge, Button, Card } from "@/components";
-import { colors, pnlColor, spacing } from "@/theme";
+import { colors, pnlColor, spacing, screenContent } from "@/theme";
 
 function confirm(message: string, onYes: () => void) {
   if (Platform.OS === "web") {
@@ -87,7 +87,7 @@ export default function AgentDetailScreen() {
   return (
     <ScrollView
       style={{ backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: spacing.lg }}
+      contentContainerStyle={screenContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
       <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md }}>

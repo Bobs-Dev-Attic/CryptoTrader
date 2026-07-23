@@ -38,7 +38,16 @@ export default function LoginScreen() {
       style={{ flex: 1, backgroundColor: colors.bg }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, justifyContent: "center", flexGrow: 1 }}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: spacing.lg,
+          justifyContent: "center",
+          flexGrow: 1,
+          width: "100%",
+          maxWidth: 460,
+          alignSelf: "center",
+        }}
+      >
         <Text style={{ color: colors.text, fontSize: 30, fontWeight: "800", marginBottom: spacing.xs }}>
           CryptoTrader
         </Text>
