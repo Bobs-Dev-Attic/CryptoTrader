@@ -167,6 +167,10 @@ export interface StrategyMeta {
   type: string;
   name: string;
   description?: string;
+  kind?: string;
+  difficulty?: string;
+  best_for?: string;
+  avoid_when?: string;
   config_schema: Record<string, StrategyParam>;
 }
 export interface Allocation {
