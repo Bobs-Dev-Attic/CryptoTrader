@@ -145,5 +145,42 @@ the in-process scheduler there, relying on the cron tick instead.
   path is a straightforward alternative).
 - **Cold starts**: the first request after idle re-creates the DB session and
   ensures tables exist; expect a short delay.
-- **Secrets**: never commit `.env`. Rotate `JWT_SECRET`/`ENCRYPTION_KEY` only with
-  care — changing `ENCRYPTION_KEY` invalidates stored exchange credentials.
+- **Secrets**: never commit `.env`. `ENCRYPTION_KEY` is now safe to *introduce*
+  (via `MultiFernet` the legacy JWT-derived key stays a decrypt fallback), but
+  once set, *rotating it away* still requires re-encrypting stored credentials.
+
+## Enabling production security enforcement
+
+By default the backend runs with warnings-only. To make it **fail closed** on
+insecure config (recommended before real users / public access):
+
+1. Generate two independent secrets:
+   ```
+   # JWT signing secret
+   python -c "import secrets; print(secrets.token_hex(32))"
+   # Fernet key for encrypting exchange API credentials at rest
+   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+   ```
+2. In **Vercel → Project → Settings → Environment Variables** (scope: **Production**),
+   add — **secrets first**:
+   - `JWT_SECRET` = the token_hex value
+   - `ENCRYPTION_KEY` = the Fernet value
+   - *(only after the two above)* `ENVIRONMENT` = `production`
+
+   Or via the Vercel CLI:
+   ```
+   vercel env add JWT_SECRET production
+   vercel env add ENCRYPTION_KEY production
+   vercel env add ENVIRONMENT production      # value: production — do this LAST
+   ```
+3. Redeploy (pushing to `main`, or Vercel → Deployments → Redeploy).
+
+**Ordering matters.** With `ENVIRONMENT=production` set, the app **refuses to
+start** if `JWT_SECRET` is default/unset or `ENCRYPTION_KEY` is unset
+(`app/main.py` → `config.security_warnings()`). Set the secrets first so the
+next boot is already valid. Because of the MultiFernet fallback, adding
+`ENCRYPTION_KEY` does **not** disturb already-stored exchange connections —
+existing ciphertext keeps decrypting, new writes use the strong key.
+
+> Changing `JWT_SECRET` invalidates existing login sessions (users re-login);
+> it does not affect stored exchange credentials.
