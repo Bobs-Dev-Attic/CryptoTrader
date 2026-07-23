@@ -42,10 +42,13 @@ The rationale behind each item is in [`docs/REVIEW.md`](./docs/REVIEW.md).
 
 ## P1 — before beta / inviting users
 
-- [ ] **Live-trading safety rails.** Market orders have no slippage guard,
-  min-notional check, max-position cap, or exchange idempotency key; a wrong
-  config can dump capital. Add pre-trade validation + a hard per-agent daily
-  notional cap. **[high][M][engineering]**
+- [x] **Live-trading safety rails.** ✅ Done (#36). `risk.live_buy_guard`
+  vets every LIVE buy: max-slippage abort (live vs. signal price), min-notional
+  floor ($5 hard + configurable), max-position cap (clamps to headroom), and a
+  per-UTC-day notional cap — all in `agent.risk_config`, surfaced in the New
+  Agent "Live-trading limits" section. Exits are never gated. (Exchange
+  client-order-id idempotency still a nice-to-have; the advisory lock from #35
+  already prevents duplicate placement.) **[high][M][engineering]**
 - [ ] **Token handling.** JWT lives in `AsyncStorage` (→ `localStorage` on web):
   any XSS exfiltrates a 24h-valid token with no revocation (logout is
   client-only). Add a strict CSP, shorten access-token TTL + refresh tokens, and

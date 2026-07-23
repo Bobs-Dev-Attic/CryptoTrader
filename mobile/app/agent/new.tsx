@@ -366,6 +366,11 @@ export default function NewAgent() {
     riskPct: "0",
     atrPeriod: "14",
     atrMult: "2",
+    // Live-trading safety rails (live mode only)
+    maxSlippage: "0",
+    minNotional: "0",
+    maxPosition: "0",
+    dailyCap: "0",
   });
 
   const [busy, setBusy] = useState(false);
@@ -493,6 +498,11 @@ export default function NewAgent() {
       risk_pct: frac(rk.riskPct),
       atr_period: Math.max(1, Math.floor(Number(rk.atrPeriod) || 14)),
       atr_mult: Number(rk.atrMult) || 2,
+      // Live-trading safety rails.
+      max_slippage_pct: frac(rk.maxSlippage),
+      min_notional: Number(rk.minNotional) || 0,
+      max_position_quote: Number(rk.maxPosition) || 0,
+      daily_notional_cap: Number(rk.dailyCap) || 0,
     };
   };
 
@@ -509,6 +519,10 @@ export default function NewAgent() {
       riskPct: pct(rc.risk_pct),
       atrPeriod: String(rc.atr_period ?? 14),
       atrMult: String(rc.atr_mult ?? 2),
+      maxSlippage: pct(rc.max_slippage_pct),
+      minNotional: String(rc.min_notional ?? 0),
+      maxPosition: String(rc.max_position_quote ?? 0),
+      dailyCap: String(rc.daily_notional_cap ?? 0),
     });
   };
 
@@ -768,6 +782,27 @@ export default function NewAgent() {
           </View>
           <View style={{ flex: 1 }}>
             <Field label="Cooldown (sec)" value={rk.cooldown} onChangeText={(v) => setRk({ ...rk, cooldown: v })} keyboardType="numeric" help="After a losing trade, wait this long before buying again." />
+          </View>
+        </View>
+
+        <View style={{ height: spacing.sm }} />
+        <Text style={{ color: colors.textDim, fontSize: 12, marginBottom: spacing.xs }}>
+          Live-trading limits — apply to real orders only (0 = off)
+        </Text>
+        <View style={{ flexDirection: "row", gap: spacing.md }}>
+          <View style={{ flex: 1 }}>
+            <Field label="Max slippage %" value={rk.maxSlippage} onChangeText={(v) => setRk({ ...rk, maxSlippage: v })} keyboardType="numeric" help="Skip a live buy if the price moved more than this since the signal bar." />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Field label="Min order (quote)" value={rk.minNotional} onChangeText={(v) => setRk({ ...rk, minNotional: v })} keyboardType="numeric" help="Don't place a live buy smaller than this (a $5 floor always applies)." />
+          </View>
+        </View>
+        <View style={{ flexDirection: "row", gap: spacing.md }}>
+          <View style={{ flex: 1 }}>
+            <Field label="Max position (quote)" value={rk.maxPosition} onChangeText={(v) => setRk({ ...rk, maxPosition: v })} keyboardType="numeric" help="Cap this agent's total live position value; buys clamp to the remaining room." />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Field label="Daily cap (quote)" value={rk.dailyCap} onChangeText={(v) => setRk({ ...rk, dailyCap: v })} keyboardType="numeric" help="Cap total live buy notional per day (UTC)." />
           </View>
         </View>
       </Card>
