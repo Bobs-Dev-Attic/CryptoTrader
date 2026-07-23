@@ -87,6 +87,16 @@ class Settings(BaseSettings):
     # DB-backed fixed-window limiter on sensitive endpoints. Disabled in tests.
     rate_limit_enabled: bool = True
 
+    # --- Data retention ---
+    # High-volume, derivable rows are pruned by age on the internal tick so the
+    # tables don't grow forever. Trades are NEVER pruned (they're the financial
+    # record win/loss stats are derived from). 0 disables that table's prune.
+    retention_enabled: bool = True
+    snapshot_retention_days: int = 90  # equity_snapshots older than this are dropped
+    signal_retention_days: int = 90    # signals older than this are dropped
+    # Max rows deleted per table per tick — keeps each prune cheap and bounded.
+    retention_batch: int = 5000
+
     # --- CORS ---
     # Comma-separated list of allowed origins for the web/mobile client.
     cors_origins: str = "*"

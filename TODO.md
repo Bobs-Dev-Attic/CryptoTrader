@@ -49,19 +49,29 @@ The rationale behind each item is in [`docs/REVIEW.md`](./docs/REVIEW.md).
   Agent "Live-trading limits" section. Exits are never gated. (Exchange
   client-order-id idempotency still a nice-to-have; the advisory lock from #35
   already prevents duplicate placement.) **[high][M][engineering]**
-- [ ] **Token handling.** JWT lives in `AsyncStorage` (→ `localStorage` on web):
-  any XSS exfiltrates a 24h-valid token with no revocation (logout is
-  client-only). Add a strict CSP, shorten access-token TTL + refresh tokens, and
-  a server-side revocation/`token_version` check. Consider httpOnly cookies.
-  **[high][M][security]**
+- [x] **Token handling.** ✅ Done (#37). Access-token TTL cut to 30 min and
+  paired with a 30-day rotating **refresh token**; both carry a `type` claim and
+  a per-user `token_version`, checked server-side in `deps.py` so
+  `/logout-all` and password change **revoke** every outstanding session (logout
+  is no longer client-only). Frontend does a single-flight **silent refresh** on
+  401. A strict **CSP** (`script-src 'self'`) plus HSTS/X-Frame-Options/nosniff/
+  Referrer-Policy/Permissions-Policy ship in `vercel.json`, validated against the
+  real web build in headless Chromium. (httpOnly cookies deferred — would require
+  reworking the same-origin fetch flow; the CSP + short TTL + revocation close the
+  XSS-exfiltration window in the meantime.) **[high][M][security]**
 - [ ] **Scanner performance.** `marketscan._candle_metric` builds a **new ccxt
   client per symbol**, each doing an implicit `load_markets()` → ~50 network
   calls per candle-metric scan. Reuse one client per exchange (cache markets),
   and cache scan results ~30–60s. **[high][S][perf]**
-- [ ] **Unbounded queries / retention.** `portfolio.equity_history` loads *all*
-  snapshots for *all* agents into memory then downsamples in Python; `signals`,
-  `equity_snapshots`, `trades` grow forever. Aggregate/downsample in SQL, add
-  `LIMIT`/time windows, and a retention job. **[high][M][perf/memory]**
+- [x] **Unbounded queries / retention.** ✅ Done (#38). New `retention.py`
+  prunes aged `equity_snapshots` and `signals` on every tick (batched
+  `id IN (SELECT … LIMIT n)`, configurable `*_retention_days`; **trades are
+  never pruned** — they're the P&L record). `portfolio.stats` win/loss is now a
+  SQL conditional-aggregation (no more loading every trade); `equity_history`,
+  `agent_equity`, and `optimize` select only the scalar columns they need, add
+  time-window / `LIMIT` bounds, and downsample — `equity_history` seeds each
+  agent's carry-in equity from its last pre-window snapshot so the total stays
+  correct at the left edge. **[high][M][perf/memory]**
 - [x] **Continuous integration.** ✅ Done (#33). `.github/workflows/ci.yml`
   runs `pytest` (backend) and `tsc --noEmit` + `expo export` (frontend) on every
   PR and push to `main`. **[high][S][engineering]**

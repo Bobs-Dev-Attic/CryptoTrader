@@ -39,6 +39,7 @@ def _run_tick() -> dict:
     now = datetime.now(timezone.utc)
     evaluated: list[int] = []
     watches_checked = 0
+    pruned = {"snapshots": 0, "signals": 0}
     db: Session = SessionLocal()
     try:
         agents = db.query(Agent).filter(Agent.status == AgentStatus.RUNNING).all()
@@ -63,9 +64,21 @@ def _run_tick() -> dict:
             watches_checked = evaluate_watches(db)
         except Exception:
             db.rollback()
+        # Prune aged snapshots/signals so the tables stay bounded (best-effort).
+        try:
+            from ..retention import prune_old_rows
+
+            pruned = prune_old_rows(db, now)
+        except Exception:
+            db.rollback()
     finally:
         db.close()
-    return {"evaluated": evaluated, "count": len(evaluated), "watches_checked": watches_checked}
+    return {
+        "evaluated": evaluated,
+        "count": len(evaluated),
+        "watches_checked": watches_checked,
+        "pruned": pruned,
+    }
 
 
 @router.api_route("/tick", methods=["GET", "POST"])

@@ -198,21 +198,36 @@ def stop_agent(
     return agent
 
 
+MAX_EQUITY_POINTS = 500
+
+
 @router.get("/{agent_id}/equity")
 def agent_equity(
     agent_id: int,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[dict]:
-    """This agent's equity curve (oldest first)."""
+    """This agent's equity curve (oldest first).
+
+    Selects only the two columns needed and takes the most recent
+    ``MAX_EQUITY_POINTS`` snapshots, then downsamples to keep the payload (and
+    memory) bounded even for long-running agents.
+    """
     agent = _owned_agent(db, user, agent_id)
-    snaps = (
-        db.query(EquitySnapshot)
+    # Most-recent-first with a cap, then flip to oldest-first for the curve.
+    recent = (
+        db.query(EquitySnapshot.created_at, EquitySnapshot.equity)
         .filter(EquitySnapshot.agent_id == agent.id)
-        .order_by(EquitySnapshot.created_at.asc())
+        .order_by(EquitySnapshot.created_at.desc())
+        .limit(MAX_EQUITY_POINTS * 8)
         .all()
     )
-    return [{"t": s.created_at.isoformat(), "equity": round(s.equity, 2)} for s in snaps]
+    rows = list(reversed(recent))
+    points = [{"t": created.isoformat(), "equity": round(eq, 2)} for created, eq in rows]
+    if len(points) > MAX_EQUITY_POINTS:
+        step = len(points) / MAX_EQUITY_POINTS
+        points = [points[int(i * step)] for i in range(MAX_EQUITY_POINTS)] + [points[-1]]
+    return points
 
 
 @router.post("/{agent_id}/run", response_model=SignalOut)
