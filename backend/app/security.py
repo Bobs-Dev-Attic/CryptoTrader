@@ -36,21 +36,29 @@ def verify_password(plain: str, hashed: str) -> bool:
 # --------------------------------------------------------------------------- #
 # JWT
 # --------------------------------------------------------------------------- #
-def create_access_token(subject: str | int, expires_minutes: int | None = None) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=expires_minutes or settings.access_token_expire_minutes
-    )
-    payload: dict[str, Any] = {"sub": str(subject), "exp": expire}
+def _create_token(subject: str | int, token_version: int, token_type: str, minutes: int) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+    payload: dict[str, Any] = {
+        "sub": str(subject),
+        "tv": token_version,   # token-version for server-side revocation
+        "type": token_type,    # "access" | "refresh"
+        "exp": expire,
+    }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def decode_access_token(token: str) -> str | None:
-    """Return the subject (user id) or None if the token is invalid/expired."""
+def create_access_token(subject: str | int, token_version: int = 0) -> str:
+    return _create_token(subject, token_version, "access", settings.access_token_expire_minutes)
+
+
+def create_refresh_token(subject: str | int, token_version: int = 0) -> str:
+    return _create_token(subject, token_version, "refresh", settings.refresh_token_expire_minutes)
+
+
+def decode_token(token: str) -> dict[str, Any] | None:
+    """Return the token's claims, or None if invalid/expired."""
     try:
-        payload = jwt.decode(
-            token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
-        )
-        return payload.get("sub")
+        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     except JWTError:
         return None
 

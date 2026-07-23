@@ -54,6 +54,11 @@ def init_db() -> None:
 # without a full migration tool. (table, column, postgres_ddl, sqlite_ddl)
 _ADDED_COLUMNS = [
     (
+        "users", "token_version",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0",
+    ),
+    (
         "agents", "risk_config",
         "ALTER TABLE agents ADD COLUMN IF NOT EXISTS risk_config JSONB NOT NULL DEFAULT '{}'::jsonb",
         "ALTER TABLE agents ADD COLUMN risk_config JSON DEFAULT '{}'",

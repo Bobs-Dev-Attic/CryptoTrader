@@ -7,7 +7,7 @@ import React, {
   useState,
 } from "react";
 
-import { api, getToken, setToken, User } from "./api";
+import { api, getToken, setRefreshToken, setToken, storeTokens, User } from "./api";
 
 interface AuthState {
   user: User | null;
@@ -40,18 +40,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const res = await api.login(email, password);
-    await setToken(res.access_token);
+    await storeTokens(res);
     setUser(res.user);
   };
 
   const register = async (email: string, password: string) => {
     const res = await api.register(email, password);
-    await setToken(res.access_token);
+    await storeTokens(res);
     setUser(res.user);
   };
 
   const logout = async () => {
     await setToken(null);
+    await setRefreshToken(null);
     setUser(null);
   };
 

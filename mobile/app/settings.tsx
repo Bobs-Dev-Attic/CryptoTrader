@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
-import { api } from "@/api";
+import { api, storeTokens } from "@/api";
 import { useAuth } from "@/auth";
 import { Button, Card, Field } from "@/components";
 import { colors, spacing, screenContent } from "@/theme";
@@ -51,15 +51,35 @@ export default function SettingsScreen() {
     if (newPassword !== confirmPassword) return setPwErr("New passwords don't match.");
     setPwBusy(true);
     try {
-      await api.updatePassword(curPassword, newPassword);
+      // Password change rotates tokens (revoking other sessions) — adopt them so
+      // this session stays signed in.
+      const res = await api.updatePassword(curPassword, newPassword);
+      await storeTokens(res);
       setCurPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setPwMsg("Password updated.");
+      setPwMsg("Password updated. Other devices have been signed out.");
     } catch (e: any) {
       setPwErr(e?.message ?? "Failed to update password");
     } finally {
       setPwBusy(false);
+    }
+  };
+
+  // Sign out of all other devices/sessions (keeps this one).
+  const [sessBusy, setSessBusy] = useState(false);
+  const [sessMsg, setSessMsg] = useState("");
+  const logoutOthers = async () => {
+    setSessBusy(true);
+    setSessMsg("");
+    try {
+      const res = await api.logoutAll();
+      await storeTokens(res);
+      setSessMsg("Signed out of all other devices.");
+    } catch (e: any) {
+      setSessMsg(e?.message ?? "Failed");
+    } finally {
+      setSessBusy(false);
     }
   };
 
@@ -126,6 +146,18 @@ export default function SettingsScreen() {
         {pwMsg ? <Text style={{ color: colors.green, marginBottom: spacing.md }}>{pwMsg}</Text> : null}
         {pwErr ? <Text style={{ color: colors.red, marginBottom: spacing.md }}>{pwErr}</Text> : null}
         <Button title="Update password" onPress={savePassword} loading={pwBusy} />
+      </Card>
+
+      {/* Sessions */}
+      <Card>
+        <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: spacing.xs }}>
+          Sessions
+        </Text>
+        <Text style={{ color: colors.textDim, fontSize: 12, marginBottom: spacing.md }}>
+          Signs you out everywhere except this device — useful if you used a shared or lost device.
+        </Text>
+        {sessMsg ? <Text style={{ color: colors.green, marginBottom: spacing.md }}>{sessMsg}</Text> : null}
+        <Button title="Log out other devices" variant="secondary" onPress={logoutOthers} loading={sessBusy} />
       </Card>
 
       <View style={{ height: spacing.xl }} />
