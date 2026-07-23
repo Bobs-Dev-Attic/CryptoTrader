@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import bcrypt
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
 from jose import JWTError, jwt
 
 from .config import settings
@@ -58,13 +58,27 @@ def decode_access_token(token: str) -> str | None:
 # --------------------------------------------------------------------------- #
 # Credential encryption (Fernet)
 # --------------------------------------------------------------------------- #
-def _fernet() -> Fernet:
-    key = settings.encryption_key.strip()
-    if not key:
-        # Dev fallback: derive a stable 32-byte key from the JWT secret.
-        digest = hashlib.sha256(settings.jwt_secret.encode()).digest()
-        key = base64.urlsafe_b64encode(digest).decode()
-    return Fernet(key.encode() if isinstance(key, str) else key)
+def _derived_key() -> str:
+    """Stable 32-byte Fernet key derived from the JWT secret (legacy/dev)."""
+    digest = hashlib.sha256(settings.jwt_secret.encode()).digest()
+    return base64.urlsafe_b64encode(digest).decode()
+
+
+def _fernet() -> MultiFernet:
+    """Encryption engine for stored secrets.
+
+    A ``MultiFernet`` encrypts with the FIRST key and decrypts with ANY key, so:
+    - When ``ENCRYPTION_KEY`` is set, it becomes the primary (new writes use it)
+      while the legacy JWT-derived key stays as a decrypt fallback — existing
+      ciphertext keeps opening, enabling a zero-downtime migration/rotation.
+    - When it's unset (dev), only the derived key is used (unchanged behavior).
+    """
+    keys: list[Fernet] = []
+    explicit = settings.encryption_key.strip()
+    if explicit:
+        keys.append(Fernet(explicit.encode()))
+    keys.append(Fernet(_derived_key().encode()))
+    return MultiFernet(keys)
 
 
 def encrypt_secret(plaintext: str) -> str:

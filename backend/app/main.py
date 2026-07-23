@@ -20,6 +20,16 @@ logger = logging.getLogger("cryptotrader.startup")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Refuse to serve with insecure secrets in production; warn loudly elsewhere.
+    problems = settings.security_warnings()
+    for p in problems:
+        logger.warning("SECURITY: %s", p)
+    if settings.is_production and problems:
+        raise RuntimeError(
+            "Refusing to start in production with insecure configuration: "
+            + " | ".join(problems)
+        )
+
     # Ensure tables exist, but NEVER let DB setup crash app startup. In
     # serverless the DB may be unreachable (e.g. DATABASE_URL not yet set), and
     # the managed schema is created via migrations anyway — so non-DB endpoints

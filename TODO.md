@@ -14,13 +14,14 @@ The rationale behind each item is in [`docs/REVIEW.md`](./docs/REVIEW.md).
 
 ## P0 — must fix before real money or public exposure
 
-- [ ] **Mandatory, independent secrets in production.** `JWT_SECRET` defaults to
-  `"change-me-in-production-please"` and `ENCRYPTION_KEY`, when unset, is derived
-  from `JWT_SECRET` (`security.py::_fernet`). If the default JWT secret ships,
-  **anyone can forge admin-less-but-any-user JWTs and decrypt every stored
-  exchange API key.** Fail startup in `environment=production` if either is
-  unset/default; make the Fernet key fully independent of the JWT secret; add
-  key-rotation notes. **[critical][S][security]**
+- [x] **Mandatory, independent secrets in production.** ✅ Done (#33).
+  `config.security_warnings()` flags a default `JWT_SECRET` / unset
+  `ENCRYPTION_KEY`; `main.py` refuses to start when `ENVIRONMENT=production` and
+  either is insecure (warns otherwise). `ENCRYPTION_KEY` is now an independent
+  primary key via `MultiFernet`, with the legacy JWT-derived key kept only as a
+  decrypt fallback — safe rotation, no data loss. **Action for the operator:**
+  set `JWT_SECRET` + `ENCRYPTION_KEY` in Vercel, *then* set
+  `ENVIRONMENT=production` to turn on enforcement. **[critical][S][security]**
 - [ ] **Concurrency guard on agent execution.** `internal.tick` → `run_agent_once`
   has no lock. If a tick runs >60s (pg_cron fires again) or is invoked twice,
   an agent can be evaluated concurrently → **duplicate live orders**. Add a DB
@@ -58,9 +59,9 @@ The rationale behind each item is in [`docs/REVIEW.md`](./docs/REVIEW.md).
   snapshots for *all* agents into memory then downsamples in Python; `signals`,
   `equity_snapshots`, `trades` grow forever. Aggregate/downsample in SQL, add
   `LIMIT`/time windows, and a retention job. **[high][M][perf/memory]**
-- [ ] **Continuous integration.** No `.github/workflows`. Add one running
-  `pytest`, `tsc --noEmit`, and `expo export` on every PR so the three-command
-  gate is enforced automatically. **[high][S][engineering]**
+- [x] **Continuous integration.** ✅ Done (#33). `.github/workflows/ci.yml`
+  runs `pytest` (backend) and `tsc --noEmit` + `expo export` (frontend) on every
+  PR and push to `main`. **[high][S][engineering]**
 - [ ] **Real migrations.** Replace `create_all` + hand-maintained
   `_ADDED_COLUMNS` with **Alembic**; the current scheme silently drifts and has
   no down-path or history. **[high][M][engineering]**

@@ -5,6 +5,9 @@ from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# The insecure default shipped for local dev. Must never be used in production.
+DEFAULT_JWT_SECRET = "change-me-in-production-please"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -50,6 +53,33 @@ class Settings(BaseSettings):
         import os
 
         return bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
+
+    @property
+    def is_production(self) -> bool:
+        """Only true when explicitly opted in via ENVIRONMENT=production.
+
+        Deliberately NOT inferred from `is_serverless`, so turning on the strict
+        secret checks is an explicit deploy decision and never silently breaks an
+        existing environment.
+        """
+        return self.environment.strip().lower() in {"production", "prod"}
+
+    def security_warnings(self) -> list[str]:
+        """Human-readable list of insecure-config problems (empty = all good)."""
+        problems: list[str] = []
+        if not self.jwt_secret or self.jwt_secret == DEFAULT_JWT_SECRET:
+            problems.append(
+                "JWT_SECRET is unset or the shipped default — anyone could forge "
+                "auth tokens. Set a strong random value."
+            )
+        if not self.encryption_key.strip():
+            problems.append(
+                "ENCRYPTION_KEY is unset — exchange API keys are encrypted with a "
+                "key DERIVED FROM JWT_SECRET (dev-only). Set an independent Fernet "
+                "key: python -c \"from cryptography.fernet import Fernet; "
+                "print(Fernet.generate_key().decode())\""
+            )
+        return problems
 
     # --- CORS ---
     # Comma-separated list of allowed origins for the web/mobile client.
