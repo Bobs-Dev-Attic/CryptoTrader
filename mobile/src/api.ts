@@ -345,6 +345,12 @@ export const api = {
       {},
       false
     ),
+  pushPublicKey: () => request<{ key: string }>("/api/push/public-key"),
+  pushSubscribe: (payload: { endpoint: string; keys: any }) =>
+    request<{ ok: boolean }>("/api/push/subscribe", { method: "POST", body: JSON.stringify(payload) }),
+  pushUnsubscribe: (endpoint: string) =>
+    request<{ ok: boolean }>("/api/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) }),
+
   listWatches: () => request<Watch[]>("/api/watchlist"),
   createWatch: (payload: { exchange: string; symbol: string; metric: string; threshold: number }) =>
     request<Watch>("/api/watchlist", { method: "POST", body: JSON.stringify(payload) }),

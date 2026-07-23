@@ -6,8 +6,16 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthProvider, useAuth } from "@/auth";
 import { AppMenu, MenuButton, MenuProvider } from "@/menu";
+import { useAlertNotifications } from "@/notifications";
 import { colors } from "@/theme";
 import { VersionBadge } from "@/VersionBadge";
+
+/** Runs the foreground alert-notification poller while signed in (web only). */
+function AlertNotifier() {
+  const { user } = useAuth();
+  useAlertNotifications(!!user);
+  return null;
+}
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -74,6 +82,7 @@ export default function RootLayout() {
               />
             </Stack>
             <AppMenu />
+            <AlertNotifier />
             <VersionBadge />
           </AuthGate>
         </MenuProvider>

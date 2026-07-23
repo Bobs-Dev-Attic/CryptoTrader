@@ -4,6 +4,7 @@ import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native"
 
 import { api, Watch } from "@/api";
 import { Badge, Button, Card, Field } from "@/components";
+import { enablePush, notificationPermission, pushSupported } from "@/notifications";
 import { colors, radius, spacing, screenContent } from "@/theme";
 
 const EXCHANGES = ["kraken", "binance", "coinbase"];
@@ -66,6 +67,20 @@ export default function Alerts() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  // Push-notification state
+  const [perm, setPerm] = useState(notificationPermission());
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMsg, setPushMsg] = useState("");
+
+  const enableNotifications = async () => {
+    setPushBusy(true);
+    setPushMsg("");
+    const res = await enablePush();
+    setPushMsg(res.message);
+    setPerm(notificationPermission());
+    setPushBusy(false);
+  };
+
   const load = useCallback(async () => {
     try {
       setWatches(await api.listWatches());
@@ -125,6 +140,36 @@ export default function Alerts() {
         Volatility alerts. Each is checked about once a minute; when a coin's metric crosses your
         threshold it's flagged <Text style={{ color: colors.yellow, fontWeight: "700" }}>TRIGGERED</Text> here.
       </Text>
+
+      {/* Push notifications */}
+      <Card>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <View style={{ flex: 1, paddingRight: spacing.md }}>
+            <Text style={{ color: colors.text, fontWeight: "700" }}>Push notifications</Text>
+            <Text style={{ color: colors.textDim, fontSize: 12, marginTop: 2 }}>
+              {!pushSupported()
+                ? "Not supported in this browser."
+                : perm === "granted"
+                ? "On — you'll get a notification when an alert triggers, even with the app closed."
+                : perm === "denied"
+                ? "Blocked. Enable notifications for this site in your browser settings."
+                : "Get notified when an alert triggers, even when the app is closed."}
+            </Text>
+          </View>
+          {pushSupported() && perm !== "denied" ? (
+            <View style={{ width: 130 }}>
+              <Button
+                title={perm === "granted" ? "Re-enable" : "Enable"}
+                onPress={enableNotifications}
+                loading={pushBusy}
+              />
+            </View>
+          ) : null}
+        </View>
+        {pushMsg ? (
+          <Text style={{ color: colors.textDim, fontSize: 12, marginTop: spacing.sm }}>{pushMsg}</Text>
+        ) : null}
+      </Card>
 
       {/* Existing watches */}
       {watches.length === 0 ? (
