@@ -29,6 +29,9 @@ async def lifespan(app: FastAPI):
             "Refusing to start in production with insecure configuration: "
             + " | ".join(problems)
         )
+    # Non-fatal config-hygiene issues (DEBUG on, wildcard CORS, …).
+    for p in settings.config_warnings():
+        logger.warning("CONFIG: %s", p)
 
     # Ensure tables exist, but NEVER let DB setup crash app startup. In
     # serverless the DB may be unreachable (e.g. DATABASE_URL not yet set), and
@@ -61,7 +64,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
-    allow_credentials=True,
+    # Auth is Bearer-token in the Authorization header, not cookies, so we don't
+    # enable credentialed CORS. Keeping this False also keeps a wildcard origin
+    # spec-valid (browsers reject `Allow-Origin: *` together with credentials).
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

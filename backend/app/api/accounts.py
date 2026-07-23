@@ -1,6 +1,8 @@
 """Exchange-account management (encrypted API-key storage)."""
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -19,6 +21,7 @@ from ..schemas import (
 from ..security import decrypt_secret, encrypt_secret
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
+logger = logging.getLogger("cryptotrader.accounts")
 
 
 def _run_validation(
@@ -46,7 +49,12 @@ def _run_validation(
     try:
         balances = adapter.fetch_balance()
     except Exception as exc:
-        msg = f"Could not authenticate: {type(exc).__name__}: {exc}"
+        # Never surface the raw exception to the client: ccxt errors can embed
+        # request details (and occasionally key material). Log only the type
+        # server-side (not str(exc), for the same reason) and return a generic
+        # message. The Coinbase hint below is static and safe.
+        logger.warning("Credential validation failed for %s: %s", exchange, type(exc).__name__)
+        msg = "Could not authenticate. Double-check the API key and secret, then try again."
         if exchange == ExchangeId.COINBASE and "base16" in str(exc).lower():
             msg = (
                 "Could not authenticate with this Coinbase key. Make sure you pasted "

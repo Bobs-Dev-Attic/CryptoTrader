@@ -17,7 +17,8 @@ class Settings(BaseSettings):
     # --- General ---
     app_name: str = "CryptoTrader"
     environment: str = "development"
-    debug: bool = True
+    # Off by default; verbose error surfaces / docs should be an explicit opt-in.
+    debug: bool = False
 
     # --- Database ---
     database_url: str = "sqlite:///./cryptotrader.db"
@@ -98,14 +99,31 @@ class Settings(BaseSettings):
     retention_batch: int = 5000
 
     # --- CORS ---
-    # Comma-separated list of allowed origins for the web/mobile client.
-    cors_origins: str = "*"
+    # Comma-separated list of allowed browser origins for the API. In production
+    # the web app is served SAME-ORIGIN (single Vercel project), so no cross-
+    # origin entry is needed; the default only opens local Expo web dev ports.
+    # Set explicitly (e.g. a custom frontend domain) if you serve the UI from a
+    # different origin. Auth uses Bearer tokens, not cookies, so credentials are
+    # not enabled and a wildcard here does not expose credentialed requests.
+    cors_origins: str = "http://localhost:8081,http://localhost:19006"
 
     @property
     def cors_origin_list(self) -> list[str]:
         if self.cors_origins.strip() == "*":
             return ["*"]
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    def config_warnings(self) -> list[str]:
+        """Non-fatal config-hygiene problems worth logging (esp. in production)."""
+        problems: list[str] = []
+        if self.debug:
+            problems.append("DEBUG is on — disable it in production (verbose errors / docs).")
+        if "*" in self.cors_origin_list:
+            problems.append(
+                "CORS_ORIGINS is a wildcard (*) — restrict it to the origins that "
+                "actually serve the UI."
+            )
+        return problems
 
 
 @lru_cache

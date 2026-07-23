@@ -87,9 +87,13 @@ The rationale behind each item is in [`docs/REVIEW.md`](./docs/REVIEW.md).
 
 ## P2 — hardening & polish
 
-- [ ] **Config hygiene.** `DEBUG=true` and `CORS_ORIGINS=*` are the defaults;
-  `_run_validation` returns raw `type(exc).__name__: exc` to clients (info leak).
-  Default DEBUG off, tighten CORS, and return generic auth-failure messages.
+- [x] **Config hygiene.** ✅ Done (#40). `DEBUG` now defaults **off** and
+  `CORS_ORIGINS` defaults to local dev origins (no wildcard); prod is same-origin
+  so needs no entry. CORS `allow_credentials` is **False** (Bearer-token auth, no
+  cookies), which also makes any wildcard spec-valid. `_run_validation` no longer
+  leaks the raw exception — it returns a generic message and logs only the
+  exception *type* server-side (never `str(exc)`, which ccxt can stuff with key
+  material). Startup logs non-fatal `config_warnings()` (DEBUG on / wildcard CORS).
   **[med][S][security]**
 - [ ] **Account security features.** Email-ownership verification on
   register/change, password strength + breach (HIBP k-anon) check, optional TOTP
