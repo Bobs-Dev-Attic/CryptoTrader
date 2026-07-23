@@ -188,6 +188,31 @@ class AgentDetail(AgentOut):
 
 
 # --------------------------------------------------------------------------- #
+# Volatility watches (alerts)
+# --------------------------------------------------------------------------- #
+class WatchCreate(BaseModel):
+    exchange: ExchangeId
+    symbol: str
+    metric: str = "range_24h"
+    threshold: float = 5.0
+
+
+class WatchOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    exchange: ExchangeId
+    symbol: str
+    metric: str
+    threshold: float
+    is_active: bool
+    last_value: float | None
+    triggered: bool
+    last_checked_at: datetime | None
+    last_triggered_at: datetime | None
+    created_at: datetime
+
+
+# --------------------------------------------------------------------------- #
 # Market data
 # --------------------------------------------------------------------------- #
 class CandleOut(BaseModel):

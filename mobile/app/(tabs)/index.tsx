@@ -74,6 +74,8 @@ export default function Dashboard() {
     >
       <PriceTicker symbols={TICKER_SYMBOLS} />
 
+      <AlertsBanner />
+
       <Text style={{ color: colors.textDim, marginBottom: spacing.lg }}>
         Signed in as {user?.email}
       </Text>
@@ -229,6 +231,49 @@ function PnlChart({ agents }: { agents: Agent[] }) {
         })
       )}
     </Card>
+  );
+}
+
+/** A dismissible-looking banner when any volatility alert is currently triggered. */
+function AlertsBanner() {
+  const router = useRouter();
+  const [count, setCount] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      api
+        .listWatches()
+        .then((ws) => alive && setCount(ws.filter((w) => w.triggered).length))
+        .catch(() => alive && setCount(0));
+      return () => {
+        alive = false;
+      };
+    }, [])
+  );
+
+  if (count === 0) return null;
+  return (
+    <Pressable onPress={() => router.push("/alerts")}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          backgroundColor: colors.surface,
+          borderRadius: radius.md,
+          borderWidth: 1,
+          borderColor: colors.yellow,
+          padding: spacing.md,
+          marginBottom: spacing.md,
+        }}
+      >
+        <Text style={{ color: colors.text, fontSize: 13 }}>
+          🔔 {count} volatility alert{count > 1 ? "s" : ""} triggered
+        </Text>
+        <Text style={{ color: colors.yellow, fontSize: 13, fontWeight: "700" }}>View →</Text>
+      </View>
+    </Pressable>
   );
 }
 

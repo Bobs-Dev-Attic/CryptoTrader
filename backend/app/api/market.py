@@ -105,6 +105,21 @@ def tickers(
         raise HTTPException(status_code=502, detail=f"Market data error: {exc}")
 
 
+@router.get("/volatility")
+def volatility(
+    exchange: ExchangeId = ExchangeId.KRAKEN,
+    metric: str = Query("range_24h", description="range_24h|change_24h|volume|ret_vol|atr_pct"),
+    limit: int = Query(25, ge=1, le=50),
+) -> dict:
+    """Rank a curated universe of coins by how volatile they are (most first)."""
+    from ..marketscan import scan
+
+    try:
+        return scan(exchange.value, metric, limit)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Market data error: {exc}")
+
+
 @router.get("/ticker")
 def ticker(exchange: ExchangeId, symbol: str) -> dict:
     adapter = get_adapter(exchange)
