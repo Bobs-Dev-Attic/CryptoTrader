@@ -88,6 +88,25 @@ class ExchangeAdapter(abc.ABC):
                 continue
         return out
 
+    def fetch_market_stats(self, symbols: list[str]) -> list[dict]:
+        """Return [{symbol, last, high, low, change_pct, volume}] for many symbols.
+
+        Used by the volatility scanner. Default implementation fetches each
+        symbol individually with no 24h high/low; adapters with a batch endpoint
+        should override for speed and richer fields.
+        """
+        out: list[dict] = []
+        for s in symbols:
+            try:
+                t = self.fetch_ticker(s)
+                out.append({
+                    "symbol": s, "last": t.last, "high": None, "low": None,
+                    "change_pct": None, "volume": None,
+                })
+            except Exception:
+                continue
+        return out
+
     # --- Account (private, live only) ------------------------------------- #
     def fetch_balance(self) -> dict[str, float]:
         """Return free balances keyed by asset. Live adapters override."""

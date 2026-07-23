@@ -186,6 +186,31 @@ class EquitySnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, index=True)
 
 
+class VolatilityWatch(Base):
+    """A user's alert on a coin's volatility metric crossing a threshold.
+
+    Evaluated by the internal tick; ``triggered`` reflects the latest check and
+    ``last_triggered_at`` marks the most recent rising-edge crossing.
+    """
+
+    __tablename__ = "volatility_watches"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    exchange: Mapped[ExchangeId] = mapped_column(String(32))
+    symbol: Mapped[str] = mapped_column(String(32))
+    # One of: range_24h | change_24h | volume | ret_vol | atr_pct
+    metric: Mapped[str] = mapped_column(String(16), default="range_24h")
+    threshold: Mapped[float] = mapped_column(Float, default=5.0)
+
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    triggered: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
 class Trade(Base):
     """An executed (or attempted) order, paper or live."""
 

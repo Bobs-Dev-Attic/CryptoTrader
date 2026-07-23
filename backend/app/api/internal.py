@@ -38,6 +38,7 @@ def _authorized(authorization: str, x_cron_secret: str) -> bool:
 def _run_tick() -> dict:
     now = datetime.now(timezone.utc)
     evaluated: list[int] = []
+    watches_checked = 0
     db: Session = SessionLocal()
     try:
         agents = db.query(Agent).filter(Agent.status == AgentStatus.RUNNING).all()
@@ -52,9 +53,16 @@ def _run_tick() -> dict:
                 evaluated.append(agent.id)
             except Exception:
                 db.rollback()
+        # Evaluate volatility alert watches (never lets a failure break the tick).
+        try:
+            from .watchlist import evaluate_watches
+
+            watches_checked = evaluate_watches(db)
+        except Exception:
+            db.rollback()
     finally:
         db.close()
-    return {"evaluated": evaluated, "count": len(evaluated)}
+    return {"evaluated": evaluated, "count": len(evaluated), "watches_checked": watches_checked}
 
 
 @router.api_route("/tick", methods=["GET", "POST"])

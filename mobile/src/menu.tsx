@@ -49,6 +49,8 @@ const ITEMS: { icon: string; label: string; path: string }[] = [
   { icon: "📊", label: "Dashboard", path: "/" },
   { icon: "🤖", label: "Agents", path: "/agents" },
   { icon: "🔑", label: "Exchanges", path: "/accounts" },
+  { icon: "📈", label: "Volatile markets", path: "/movers" },
+  { icon: "🔔", label: "Alerts", path: "/alerts" },
   { icon: "⚙️", label: "Account settings", path: "/settings" },
 ];
 

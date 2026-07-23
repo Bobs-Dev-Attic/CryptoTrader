@@ -167,6 +167,28 @@ class CcxtAdapter(ExchangeAdapter):
             )
         return out
 
+    def fetch_market_stats(self, symbols: list[str]) -> list[dict]:
+        """Batch 24h stats (last/high/low/change/volume) via ccxt fetch_tickers."""
+        try:
+            data = self.client.fetch_tickers(symbols)
+        except Exception:
+            return super().fetch_market_stats(symbols)
+        out: list[dict] = []
+        for s in symbols:
+            t = data.get(s)
+            if not t:
+                continue
+            pct = t.get("percentage")
+            out.append({
+                "symbol": s,
+                "last": float(t.get("last") or t.get("close") or 0.0),
+                "high": float(t["high"]) if t.get("high") is not None else None,
+                "low": float(t["low"]) if t.get("low") is not None else None,
+                "change_pct": float(pct) if pct is not None else None,
+                "volume": float(t["quoteVolume"]) if t.get("quoteVolume") is not None else None,
+            })
+        return out
+
     # --- Account (live) ------------------------------------------------ #
     def fetch_balance(self) -> dict[str, float]:
         bal = self.client.fetch_balance()

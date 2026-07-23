@@ -64,6 +64,14 @@ export default function RootLayout() {
                 name="settings"
                 options={{ title: "Account settings", headerLeft: () => <MenuButton /> }}
               />
+              <Stack.Screen
+                name="movers"
+                options={{ title: "Volatile markets", headerLeft: () => <MenuButton /> }}
+              />
+              <Stack.Screen
+                name="alerts"
+                options={{ title: "Alerts", headerLeft: () => <MenuButton /> }}
+              />
             </Stack>
             <AppMenu />
             <VersionBadge />

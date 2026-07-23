@@ -218,6 +218,34 @@ export interface Candle {
   close: number;
   volume: number;
 }
+export interface VolRow {
+  symbol: string;
+  base: string;
+  last: number | null;
+  range_24h: number | null;
+  change_24h: number | null;
+  volume: number | null;
+  ret_vol: number | null;
+  atr_pct: number | null;
+}
+export interface VolScan {
+  exchange: string;
+  metric: string;
+  rows: VolRow[];
+}
+export interface Watch {
+  id: number;
+  exchange: string;
+  symbol: string;
+  metric: string;
+  threshold: number;
+  is_active: boolean;
+  last_value: number | null;
+  triggered: boolean;
+  last_checked_at: string | null;
+  last_triggered_at: string | null;
+  created_at: string;
+}
 
 // --- Endpoints ------------------------------------------------------------ //
 export const api = {
@@ -309,6 +337,19 @@ export const api = {
       {},
       false
     ),
+  volatility: (exchange: string, metric = "range_24h", limit = 25) =>
+    request<VolScan>(
+      `/api/market/volatility?exchange=${encodeURIComponent(exchange)}&metric=${encodeURIComponent(
+        metric
+      )}&limit=${limit}`,
+      {},
+      false
+    ),
+  listWatches: () => request<Watch[]>("/api/watchlist"),
+  createWatch: (payload: { exchange: string; symbol: string; metric: string; threshold: number }) =>
+    request<Watch>("/api/watchlist", { method: "POST", body: JSON.stringify(payload) }),
+  deleteWatch: (id: number) => request<void>(`/api/watchlist/${id}`, { method: "DELETE" }),
+
   tickers: (exchange: string, symbols: string[]) =>
     request<TickerQuote[]>(
       `/api/market/tickers?exchange=${encodeURIComponent(exchange)}&symbols=${encodeURIComponent(
