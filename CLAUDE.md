@@ -60,7 +60,8 @@ cd backend && python -m pytest -q
 cd mobile && npx tsc --noEmit
 cd mobile && npx expo export --platform web --clear
 ```
-There is **no CI** yet — these three are the gate. Always run all three.
+CI (`.github/workflows/ci.yml`) runs these on every PR, but run them locally
+before pushing too — they are the gate.
 
 ## Ship workflow (this repo's established pattern)
 1. Work on branch `claude/crypto-trading-bot-app-ht4bhj`.

@@ -10,7 +10,7 @@ only the highest-leverage rules so Codex doesn't have to rediscover them.
   `/api/*` Python serverless) against **Supabase Postgres**. A **pg_cron** job
   hits `POST /api/internal/tick` every minute to run agents + evaluate alerts.
 
-## Gate before shipping (no CI exists — run all three)
+## Gate before shipping (CI runs these on every PR — run them locally too)
 ```
 cd backend && python -m pytest -q
 cd mobile && npx tsc --noEmit
