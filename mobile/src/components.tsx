@@ -7,11 +7,38 @@ import {
   Text,
   TextInput,
   TextInputProps,
+  useWindowDimensions,
   View,
   ViewStyle,
 } from "react-native";
 
 import { colors, radius, spacing } from "./theme";
+
+/** Number of columns to tile cards into, based on the viewport width. */
+export function useColumns(breakpoint = 860): number {
+  const { width } = useWindowDimensions();
+  return width >= breakpoint ? 2 : 1;
+}
+
+/**
+ * Lays children out in a responsive grid (2 columns on wide screens, 1 on
+ * phones). Each child is wrapped so it takes an equal column width.
+ */
+export function CardGrid({ children, columns }: { children: React.ReactNode; columns?: number }) {
+  const auto = useColumns();
+  const cols = columns ?? auto;
+  const items = React.Children.toArray(children);
+  if (cols === 1) return <>{children}</>;
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }}>
+      {items.map((child, i) => (
+        <View key={i} style={{ width: "49%" }}>
+          {child}
+        </View>
+      ))}
+    </View>
+  );
+}
 
 /**
  * A field label with an optional tap-to-reveal help hint (ⓘ). Works on web and

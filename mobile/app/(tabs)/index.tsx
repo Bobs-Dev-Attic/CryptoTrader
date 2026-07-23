@@ -5,9 +5,9 @@ import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native"
 import { Agent, api, OptimizeResult } from "@/api";
 import { useAuth } from "@/auth";
 import { Donut, LineChart, Sparkline } from "@/charts";
-import { Badge, Button, Card } from "@/components";
+import { Badge, Button, Card, CardGrid } from "@/components";
 import { PriceTicker } from "@/PriceTicker";
-import { colors, pnlColor, radius, spacing } from "@/theme";
+import { colors, pnlColor, radius, spacing, screenContent } from "@/theme";
 
 const TICKER_SYMBOLS = [
   "BTC/USD",
@@ -69,7 +69,7 @@ export default function Dashboard() {
   return (
     <ScrollView
       style={{ backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: spacing.lg }}
+      contentContainerStyle={screenContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
       <PriceTicker symbols={TICKER_SYMBOLS} />
@@ -157,25 +157,27 @@ export default function Dashboard() {
           <Button title="Create an agent" onPress={() => router.push("/agent/new")} />
         </Card>
       ) : (
-        agents.map((a) => (
-          <Card key={a.id}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <Text style={{ color: colors.text, fontSize: 16, fontWeight: "600" }}>{a.name}</Text>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-                <Sparkline exchange={a.exchange} symbol={a.symbol} timeframe={a.timeframe} />
-                <Badge
-                  label={a.status}
-                  color={a.status === "running" ? colors.green : a.status === "error" ? colors.red : colors.textDim}
-                />
+        <CardGrid>
+          {agents.map((a) => (
+            <Card key={a.id}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ color: colors.text, fontSize: 16, fontWeight: "600" }}>{a.name}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                  <Sparkline exchange={a.exchange} symbol={a.symbol} timeframe={a.timeframe} />
+                  <Badge
+                    label={a.status}
+                    color={a.status === "running" ? colors.green : a.status === "error" ? colors.red : colors.textDim}
+                  />
+                </View>
               </View>
-            </View>
-            <Text style={{ color: colors.textDim, marginTop: spacing.xs }}>
-              {a.exchange.toUpperCase()} · {a.symbol} · {a.trade_mode} · {a.strategy_type}
-            </Text>
-            <View style={{ height: spacing.md }} />
-            <Button title="Open" variant="secondary" onPress={() => router.push(`/agent/${a.id}`)} />
-          </Card>
-        ))
+              <Text style={{ color: colors.textDim, marginTop: spacing.xs }}>
+                {a.exchange.toUpperCase()} · {a.symbol} · {a.trade_mode} · {a.strategy_type}
+              </Text>
+              <View style={{ height: spacing.md }} />
+              <Button title="Open" variant="secondary" onPress={() => router.push(`/agent/${a.id}`)} />
+            </Card>
+          ))}
+        </CardGrid>
       )}
 
       <View style={{ height: spacing.xl }} />

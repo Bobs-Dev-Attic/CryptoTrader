@@ -4,7 +4,7 @@ import { Alert, Platform, Pressable, RefreshControl, ScrollView, Text, View } fr
 
 import { api, ExchangeAccount } from "@/api";
 import { Badge, Button, Card } from "@/components";
-import { colors, radius, spacing } from "@/theme";
+import { colors, radius, spacing, screenContent } from "@/theme";
 
 function confirm(message: string, onYes: () => void) {
   if (Platform.OS === "web") {
@@ -89,7 +89,7 @@ export default function AccountsScreen() {
   return (
     <ScrollView
       style={{ backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: spacing.lg }}
+      contentContainerStyle={screenContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
       {/* Top button row */}
