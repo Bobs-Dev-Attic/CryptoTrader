@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 
 const TOKEN_KEY = "cryptotrader.token";
+const REFRESH_KEY = "cryptotrader.refresh";
 
 export function getBaseUrl(): string {
   // 1) Explicit override always wins (useful for native builds / custom hosts).
@@ -35,6 +36,57 @@ export async function setToken(token: string | null): Promise<void> {
   else await AsyncStorage.removeItem(TOKEN_KEY);
 }
 
+export async function getRefreshToken(): Promise<string | null> {
+  return AsyncStorage.getItem(REFRESH_KEY);
+}
+
+export async function setRefreshToken(token: string | null): Promise<void> {
+  if (token) await AsyncStorage.setItem(REFRESH_KEY, token);
+  else await AsyncStorage.removeItem(REFRESH_KEY);
+}
+
+/** Persist an access+refresh pair (from login/register/refresh/logout-all). */
+export async function storeTokens(t: { access_token: string; refresh_token?: string }): Promise<void> {
+  await setToken(t.access_token);
+  if (t.refresh_token) await setRefreshToken(t.refresh_token);
+}
+
+// Single-flight refresh: many requests may 401 at once; refresh only once.
+let _refreshInFlight: Promise<boolean> | null = null;
+
+async function tryRefresh(): Promise<boolean> {
+  if (_refreshInFlight) return _refreshInFlight;
+  _refreshInFlight = (async () => {
+    const rt = await getRefreshToken();
+    if (!rt) return false;
+    const base = getBaseUrl();
+    try {
+      const resp = await fetch(`${base}/api/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: rt }),
+      });
+      if (!resp.ok) {
+        // Refresh token is invalid/expired/revoked — end the session.
+        await setToken(null);
+        await setRefreshToken(null);
+        return false;
+      }
+      const data = await resp.json();
+      await setToken(data.access_token);
+      if (data.refresh_token) await setRefreshToken(data.refresh_token);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  try {
+    return await _refreshInFlight;
+  } finally {
+    _refreshInFlight = null;
+  }
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -46,7 +98,8 @@ export class ApiError extends Error {
 async function request<T>(
   path: string,
   options: RequestInit = {},
-  auth = true
+  auth = true,
+  retried = false
 ): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -63,6 +116,10 @@ async function request<T>(
   } catch {
     // fetch throws (TypeError) when the server is unreachable / blocked.
     throw new ApiError(0, unreachableMessage(base));
+  }
+  // Access token expired? Refresh once and retry transparently.
+  if (resp.status === 401 && auth && !retried && !path.includes("/api/auth/")) {
+    if (await tryRefresh()) return request<T>(path, options, auth, true);
   }
   const text = await resp.text();
   const data = text ? JSON.parse(text) : null;
@@ -92,6 +149,7 @@ export interface User {
 }
 export interface TokenResponse {
   access_token: string;
+  refresh_token: string;
   token_type: string;
   user: User;
 }
@@ -282,10 +340,11 @@ export const api = {
       body: JSON.stringify({ new_email, current_password }),
     }),
   updatePassword: (current_password: string, new_password: string) =>
-    request<{ ok: boolean; detail: string }>("/api/auth/password", {
+    request<TokenResponse>("/api/auth/password", {
       method: "PATCH",
       body: JSON.stringify({ current_password, new_password }),
     }),
+  logoutAll: () => request<TokenResponse>("/api/auth/logout-all", { method: "POST" }),
 
   listAgents: () => request<Agent[]>("/api/agents"),
   getAgent: (id: number) => request<AgentDetail>(`/api/agents/${id}`),

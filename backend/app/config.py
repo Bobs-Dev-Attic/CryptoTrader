@@ -26,7 +26,9 @@ class Settings(BaseSettings):
     # Secret used to sign JWTs. MUST be overridden in production.
     jwt_secret: str = "change-me-in-production-please"
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60 * 24  # 1 day
+    # Short-lived access tokens; long-lived refresh tokens exchanged at /auth/refresh.
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_minutes: int = 60 * 24 * 30  # 30 days
 
     # --- Encryption ---
     # Fernet key used to encrypt exchange API credentials at rest.
