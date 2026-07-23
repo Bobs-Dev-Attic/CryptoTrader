@@ -15,6 +15,12 @@ risk_config keys (all optional):
     risk_pct           float  fraction of equity per trade (sizing modes)
     atr_period         int    ATR lookback for atr_target sizing (default 14)
     atr_mult           float  stop distance in ATRs for atr_target sizing (default 2)
+
+Live-trading safety rails (LIVE mode only; applied to BUY entries, never exits):
+    max_slippage_pct    float  abort a live buy if price moved > this since the bar
+    min_notional        float  don't place a live buy below this (default 5)
+    max_position_quote  float  cap total position value; clamp/skip beyond it
+    daily_notional_cap  float  cap total live buy notional per UTC day
 """
 from __future__ import annotations
 
@@ -23,9 +29,12 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..enums import OrderSide
+from ..enums import OrderSide, TradeMode
 from ..models import Agent, EquitySnapshot, Position, Trade
 from . import indicators as ind
+
+# Absolute floor for a live order notional, even if the agent sets a lower one.
+_MIN_NOTIONAL_FLOOR = 5.0
 
 
 def _f(cfg: dict, key: str, default: float = 0.0) -> float:
@@ -33,6 +42,67 @@ def _f(cfg: dict, key: str, default: float = 0.0) -> float:
         return float(cfg.get(key, default) or 0.0)
     except (TypeError, ValueError):
         return default
+
+
+def live_buy_guard(
+    db: Session | None,
+    agent: Agent,
+    decision_price: float,
+    live_price: float,
+    buy_quote: float,
+    position: Position,
+) -> tuple[float, str | None]:
+    """Vet a LIVE buy against the safety rails. Returns (adjusted_quote, reason).
+
+    ``reason`` non-None means DO NOT trade (and explains why). Otherwise the
+    (possibly clamped) notional to actually deploy is returned. Exits (sells) are
+    never gated — an agent must always be able to get out.
+    """
+    cfg = agent.risk_config or {}
+    min_notional = max(_f(cfg, "min_notional"), _MIN_NOTIONAL_FLOOR)
+    max_slip = _f(cfg, "max_slippage_pct")
+    max_pos = _f(cfg, "max_position_quote")
+    daily_cap = _f(cfg, "daily_notional_cap")
+
+    # Slippage: abort if the live price has moved too far from the decision bar.
+    if max_slip > 0 and decision_price > 0 and live_price > 0:
+        slip = abs(live_price - decision_price) / decision_price
+        if slip > max_slip:
+            return 0.0, (
+                f"slippage guard — price moved {slip * 100:.2f}% since the signal "
+                f"(> {max_slip * 100:.2f}% allowed)"
+            )
+
+    # Max position cap: clamp the buy to remaining headroom.
+    if max_pos > 0:
+        current = position.quantity * (live_price or decision_price)
+        headroom = max_pos - current
+        if headroom <= 0:
+            return 0.0, f"position cap reached (${current:.2f} ≥ ${max_pos:.2f})"
+        buy_quote = min(buy_quote, headroom)
+
+    # Daily notional cap: clamp to what's left of today's live-buy budget.
+    if daily_cap > 0 and db is not None:
+        day_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        spent = (
+            db.query(func.coalesce(func.sum(Trade.cost_quote), 0.0))
+            .filter(
+                Trade.agent_id == agent.id,
+                Trade.trade_mode == TradeMode.LIVE,
+                Trade.side == OrderSide.BUY,
+                Trade.created_at >= day_start,
+            )
+            .scalar()
+            or 0.0
+        )
+        remaining = daily_cap - spent
+        if remaining <= 0:
+            return 0.0, f"daily notional cap reached (${spent:.2f} ≥ ${daily_cap:.2f})"
+        buy_quote = min(buy_quote, remaining)
+
+    if buy_quote < min_notional:
+        return 0.0, f"order ${buy_quote:.2f} below minimum notional ${min_notional:.2f}"
+    return round(buy_quote, 2), None
 
 
 def check_exit(cfg: dict, position: Position, price: float) -> str | None:

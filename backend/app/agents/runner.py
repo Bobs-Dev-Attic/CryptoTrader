@@ -249,7 +249,19 @@ def self_execute(
     else:  # LIVE
         adapter = _live_adapter(agent)
         if action == SignalAction.BUY:
-            qty = buy_quote / price if price > 0 else 0.0
+            # Use the live price for the guard + sizing (market may have moved).
+            try:
+                live_price = adapter.fetch_ticker(agent.symbol).last or price
+            except Exception:
+                live_price = price
+            adj_quote, reason = risk.live_buy_guard(db, agent, price, live_price, buy_quote, position)
+            if reason:
+                signal.rationale += f" | live buy skipped — {reason}"
+                return
+            qty = adj_quote / live_price if live_price > 0 else 0.0
+            if qty <= 0:
+                signal.rationale += " | live buy skipped — computed zero quantity"
+                return
             result = adapter.create_market_order(agent.symbol, "buy", qty)
             # Track position from the fill (best-effort; live balances are source of truth).
             filled = result.quantity
