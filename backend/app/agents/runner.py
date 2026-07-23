@@ -7,7 +7,7 @@ Signal for every evaluation plus a Trade whenever an order is executed.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,7 @@ from ..enums import (
 from ..exchanges import get_adapter
 from ..exchanges.base import OrderResult
 from ..exchanges.paper import Ledger, PaperBroker
+from ..locks import try_agent_lock
 from ..models import Agent, EquitySnapshot, Position, Signal, Trade
 from ..security import decrypt_secret
 from . import risk
@@ -44,9 +45,32 @@ def _get_or_create_position(db: Session, agent: Agent) -> Position:
     return pos
 
 
-def run_agent_once(db: Session, agent: Agent) -> Signal:
-    """Evaluate one agent and execute any resulting order. Returns the Signal."""
-    agent.last_run_at = datetime.now(timezone.utc)
+def run_agent_once(
+    db: Session, agent: Agent, respect_interval: bool = False
+) -> Signal | None:
+    """Evaluate one agent and execute any resulting order.
+
+    Returns the recorded Signal, or ``None`` when the evaluation is skipped
+    because another worker holds the per-agent lock, or (``respect_interval``)
+    the agent isn't due yet — checked *inside* the lock so overlapping ticks can
+    never double-execute the same agent (and never place duplicate live orders).
+    """
+    # Cross-instance guard: acquire the per-agent transaction advisory lock.
+    if not try_agent_lock(db, agent.id):
+        db.rollback()
+        return None
+    db.refresh(agent)  # read fresh last_run_at while holding the lock
+
+    now = datetime.now(timezone.utc)
+    if respect_interval and agent.last_run_at is not None:
+        last = agent.last_run_at
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        if last + timedelta(seconds=agent.interval_seconds) > now:
+            db.rollback()  # not due — another worker just ran it; release lock
+            return None
+
+    agent.last_run_at = now
 
     # Credentials (only needed for live trading / private data).
     api_key = api_secret = api_pass = ""

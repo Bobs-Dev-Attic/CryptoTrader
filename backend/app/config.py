@@ -81,6 +81,10 @@ class Settings(BaseSettings):
             )
         return problems
 
+    # --- Rate limiting ---
+    # DB-backed fixed-window limiter on sensitive endpoints. Disabled in tests.
+    rate_limit_enabled: bool = True
+
     # --- CORS ---
     # Comma-separated list of allowed origins for the web/mobile client.
     cors_origins: str = "*"

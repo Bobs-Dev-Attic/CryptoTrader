@@ -7,11 +7,17 @@ symbol concurrently so a full scan still returns quickly on serverless.
 """
 from __future__ import annotations
 
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 from .agents import indicators as ind
 from .enums import ExchangeId
 from .exchanges import get_adapter
+
+# Short in-process cache so repeated scans (auto-refresh, many clients) don't
+# re-fan-out to the exchange. Per-instance on serverless; that's fine.
+_SCAN_CACHE: dict[tuple, tuple[float, dict]] = {}
+_SCAN_TTL = 30.0
 
 # A hand-picked set of liquid, well-known base assets. The scan tolerates any
 # that a given exchange doesn't list (they're simply skipped).
@@ -98,6 +104,13 @@ def scan(exchange: str, metric: str = "range_24h", limit: int = 25) -> dict:
     """Return the universe ranked by ``metric`` (most volatile first)."""
     if metric not in ALL_METRICS:
         metric = "range_24h"
+
+    cache_key = (exchange, metric, limit)
+    now = time.time()
+    cached = _SCAN_CACHE.get(cache_key)
+    if cached and now - cached[0] < _SCAN_TTL:
+        return cached[1]
+
     stats = _stats(exchange)
     symbols = [s for s in universe(exchange) if s in stats]
 
@@ -133,7 +146,9 @@ def scan(exchange: str, metric: str = "range_24h", limit: int = 25) -> dict:
         return v if isinstance(v, (int, float)) else float("-inf")
 
     rows.sort(key=sort_key, reverse=True)
-    return {"exchange": exchange, "metric": metric, "rows": rows[:limit]}
+    result = {"exchange": exchange, "metric": metric, "rows": rows[:limit]}
+    _SCAN_CACHE[cache_key] = (now, result)
+    return result
 
 
 def symbol_value(exchange: str, symbol: str, metric: str, stats: dict | None = None) -> float | None:

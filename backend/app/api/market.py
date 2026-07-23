@@ -1,10 +1,13 @@
 """Public market-data endpoints (candles + ticker) used by charts/config UI."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy.orm import Session
 
+from ..database import get_db
 from ..enums import ExchangeId
 from ..exchanges import get_adapter
+from ..ratelimit import enforce as rate_limit
 from ..schemas import CandleOut
 
 router = APIRouter(prefix="/api/market", tags=["market"])
@@ -107,11 +110,18 @@ def tickers(
 
 @router.get("/volatility")
 def volatility(
+    request: Request,
     exchange: ExchangeId = ExchangeId.KRAKEN,
     metric: str = Query("range_24h", description="range_24h|change_24h|volume|ret_vol|atr_pct"),
     limit: int = Query(25, ge=1, le=50),
+    db: Session = Depends(get_db),
 ) -> dict:
-    """Rank a curated universe of coins by how volatile they are (most first)."""
+    """Rank a curated universe of coins by how volatile they are (most first).
+
+    Rate-limited and cached (this endpoint fans out to the exchange), so it can't
+    be used to amplify load.
+    """
+    rate_limit(request, db, "volatility", limit=30, window_seconds=60)  # 30/min/IP
     from ..marketscan import scan
 
     try:

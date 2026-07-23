@@ -22,17 +22,17 @@ The rationale behind each item is in [`docs/REVIEW.md`](./docs/REVIEW.md).
   decrypt fallback — safe rotation, no data loss. **Action for the operator:**
   set `JWT_SECRET` + `ENCRYPTION_KEY` in Vercel, *then* set
   `ENVIRONMENT=production` to turn on enforcement. **[critical][S][security]**
-- [ ] **Concurrency guard on agent execution.** `internal.tick` → `run_agent_once`
-  has no lock. If a tick runs >60s (pg_cron fires again) or is invoked twice,
-  an agent can be evaluated concurrently → **duplicate live orders**. Add a DB
-  advisory lock / `SELECT … FOR UPDATE SKIP LOCKED` per agent, or an idempotency
-  key on order placement. **[critical][M][security/correctness]**
-- [ ] **Rate limiting.** No throttling on `/api/auth/login` or `/register`
-  (credential stuffing / brute force, no lockout) or on the **unauthenticated**
-  `/api/market/*` endpoints — `/api/market/volatility?metric=ret_vol` fans out
-  to ~25 exchange calls per request (DoS amplification). Add per-IP + per-account
-  limits (e.g. slowapi / Redis token bucket) and cache market scans.
-  **[critical][M][security]**
+- [x] **Concurrency guard on agent execution.** ✅ Done (#35). `run_agent_once`
+  takes a per-agent Postgres **transaction-level advisory lock**
+  (`pg_try_advisory_xact_lock`, pooler-safe) and re-checks due-ness *inside* the
+  lock (`respect_interval`), so overlapping ticks can't double-run an agent or
+  place duplicate live orders; manual `/run` returns 409 if one is already in
+  flight. No-op on SQLite. **[critical][M][security/correctness]**
+- [x] **Rate limiting.** ✅ Done (#35). DB-backed fixed-window limiter
+  (`ratelimit.py`, no Redis needed) on `/api/auth/login` (10/min/IP),
+  `/register` (10/hr/IP), and the unauthenticated `/api/market/volatility`
+  (30/min/IP), which is also now cached ~30s to remove the fan-out
+  amplification. Fail-open on store errors. **[critical][M][security]**
 - [ ] **Legal groundwork before any live trade.** Risk disclaimer + explicit
   consent, Terms of Service, Privacy Policy, and jurisdiction gating. An app that
   places real trades and custodies exchange API keys implicates money-transmission,
