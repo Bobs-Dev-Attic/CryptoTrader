@@ -95,9 +95,25 @@ be evaluated on demand via `POST /api/agents/{id}/run`.
 - **Richer LLM desk** — expand `llm_agent.py` into the full multi-agent debate
   (separate analyst/researcher/trader calls) from TradingAgents.
 
+## Added since the initial design (v0.2 → v0.6)
+
+The diagram above still holds; these modules extend it. See `../CLAUDE.md` for
+the full file map and `../TODO.md` / `REVIEW.md` for the current critique.
+
+| Area | Module(s) | What it adds |
+| --- | --- | --- |
+| More strategies | `agents/technical.py`, `agents/indicators.py` | Donchian, SuperTrend, Bollinger, Z-score, momentum, ADX + OHLC indicators (ATR, Bollinger, ADX, …), each with decision-support metadata in `registry.py`. |
+| Risk overlays | `agents/risk.py` (applied in `runner.py`) | Position sizing (fixed / %-equity / ATR-target), stop-loss / take-profit / trailing stop, max-drawdown kill-switch, post-loss cooldown, via `agents.risk_config`. |
+| Portfolio | `api/portfolio.py` | Equity history, allocation, stats, and `/optimize` (risk-parity / equal / Sharpe suggestion). |
+| Volatility radar | `marketscan.py`, `api/market.py` | Ranks a curated universe by 24h range / move / volume / return-vol / ATR%. |
+| Alerts | `api/watchlist.py`, `VolatilityWatch` | Threshold watches evaluated each tick (rising-edge triggered state). |
+| Push | `push.py`, `api/push.py`, `mobile/public/sw.js` | Web Push (auto-generated VAPID) + a foreground notifier fallback. |
+| Serverless cron | `api/internal.py` | pg_cron `POST /api/internal/tick` runs due agents **and** evaluates alert watches. |
+| Schema self-heal | `database.py::_ensure_columns` | Idempotent `ALTER … ADD COLUMN IF NOT EXISTS` so column additions need no manual migration (no Alembic yet — see TODO). |
+
 ## Roadmap ideas
 
-- WebSocket push for live position/price updates.
-- Backtesting harness reusing the same `Strategy` interface over historical data.
-- Portfolio-level risk limits across agents (max exposure, daily loss cap).
-- Notifications (price alerts, trade confirmations) to mobile.
+- WebSocket push for live position/price updates (replace polling).
+- Offline backtesting harness reusing the same `Strategy` interface.
+- Alembic migrations to replace `create_all` + `_ensure_columns`.
+- The security & compliance hardening tracked in `../TODO.md` (P0/P1).
