@@ -98,8 +98,13 @@ The rationale behind each item is in [`docs/REVIEW.md`](./docs/REVIEW.md).
 - [ ] **Account security features.** Email-ownership verification on
   register/change, password strength + breach (HIBP k-anon) check, optional TOTP
   2FA, and audit logging of security events. **[med][M][security]**
-- [ ] **Observability.** No error tracking or structured logs. Add Sentry (or
-  equivalent) + request/trade audit logs; alert on tick failures. **[med][S][eng]**
+- [x] **Observability.** ✅ Done (#41). New `observability.py`: optional
+  **Sentry** error tracking (gated on `SENTRY_DSN`, SDK imported lazily so it's
+  dormant + dependency-free when unset), **structured JSON logs** (`LOG_JSON`),
+  a **`trade.executed` audit trail** (no secrets/PII), and `capture_exception`
+  wired into the previously-silent tick `except` blocks — the tick now counts
+  errors, emits a `tick.failures` audit event, and returns an `errors` field.
+  **[med][S][eng]**
 - [ ] **Secret-leak review.** Ensure ccxt exceptions (which can embed request
   details) are never logged verbatim where they might include key material.
   **[med][S][security]**

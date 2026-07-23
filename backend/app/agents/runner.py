@@ -6,7 +6,6 @@ Signal for every evaluation plus a Trade whenever an order is executed.
 """
 from __future__ import annotations
 
-import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
@@ -22,12 +21,11 @@ from ..exchanges.base import OrderResult
 from ..exchanges.paper import Ledger, PaperBroker
 from ..locks import try_agent_lock
 from ..models import Agent, EquitySnapshot, Position, Signal, Trade
+from ..observability import audit, capture_exception
 from ..security import decrypt_secret
 from . import risk
 from .base import StrategyContext, StrategyDecision
 from .registry import build_strategy
-
-logger = logging.getLogger("cryptotrader.runner")
 
 
 def _get_or_create_position(db: Session, agent: Agent) -> Position:
@@ -176,7 +174,9 @@ def run_agent_once(
         except Exception as exc:
             agent.status = AgentStatus.ERROR
             agent.last_error = f"execution error: {exc}"
-            logger.exception("Execution failed for agent %s", agent.id)
+            capture_exception(
+                exc, agent_id=agent.id, exchange=str(agent.exchange), trade_mode=str(agent.trade_mode)
+            )
     else:
         agent.status = AgentStatus.RUNNING
         agent.last_error = ""
@@ -303,6 +303,21 @@ def self_execute(
         note=result.note,
     )
     db.add(trade)
+
+    # Immutable audit trail of every executed order (no secrets / PII).
+    audit(
+        "trade.executed",
+        agent_id=agent.id,
+        trade_mode=str(agent.trade_mode),
+        exchange=str(agent.exchange),
+        side=str(result.side),
+        symbol=result.symbol,
+        quantity=result.quantity,
+        price=result.price,
+        cost_quote=result.cost,
+        realized_pnl=trade_realized,
+        external_id=result.external_id or None,
+    )
 
 
 def _live_adapter(agent: Agent):
