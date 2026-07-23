@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api import accounts, agents, auth, internal, market, portfolio, push, watchlist
 from .config import settings
 from .database import init_db
+from .observability import init_observability
 from .scheduler import shutdown_scheduler, start_scheduler
 
 logging.basicConfig(level=logging.INFO)
@@ -20,6 +21,10 @@ logger = logging.getLogger("cryptotrader.startup")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Configure structured logging + error tracking first so anything below is
+    # captured. No-op (beyond logging setup) unless SENTRY_DSN is set.
+    init_observability()
+
     # Refuse to serve with insecure secrets in production; warn loudly elsewhere.
     problems = settings.security_warnings()
     for p in problems:

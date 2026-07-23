@@ -16,6 +16,7 @@ from ..config import settings
 from ..database import SessionLocal
 from ..enums import AgentStatus
 from ..models import Agent
+from ..observability import audit, capture_exception
 
 router = APIRouter(prefix="/api/internal", tags=["internal"])
 
@@ -38,6 +39,7 @@ def _authorized(authorization: str, x_cron_secret: str) -> bool:
 def _run_tick() -> dict:
     now = datetime.now(timezone.utc)
     evaluated: list[int] = []
+    errors = 0
     watches_checked = 0
     pruned = {"snapshots": 0, "signals": 0}
     db: Session = SessionLocal()
@@ -55,27 +57,37 @@ def _run_tick() -> dict:
                 sig = run_agent_once(db, agent, respect_interval=True)
                 if sig is not None:
                     evaluated.append(agent.id)
-            except Exception:
+            except Exception as exc:
                 db.rollback()
+                errors += 1
+                # Surface the failure instead of swallowing it silently.
+                capture_exception(exc, where="tick.agent", agent_id=agent.id)
         # Evaluate volatility alert watches (never lets a failure break the tick).
         try:
             from .watchlist import evaluate_watches
 
             watches_checked = evaluate_watches(db)
-        except Exception:
+        except Exception as exc:
             db.rollback()
+            errors += 1
+            capture_exception(exc, where="tick.watches")
         # Prune aged snapshots/signals so the tables stay bounded (best-effort).
         try:
             from ..retention import prune_old_rows
 
             pruned = prune_old_rows(db, now)
-        except Exception:
+        except Exception as exc:
             db.rollback()
+            errors += 1
+            capture_exception(exc, where="tick.retention")
     finally:
         db.close()
+    if errors:
+        audit("tick.failures", count=errors, evaluated=len(evaluated))
     return {
         "evaluated": evaluated,
         "count": len(evaluated),
+        "errors": errors,
         "watches_checked": watches_checked,
         "pruned": pruned,
     }

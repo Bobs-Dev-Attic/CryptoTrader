@@ -17,6 +17,7 @@ psycopg2-binary==2.9.10
 anthropic==0.42.0
 httpx==0.28.1
 pywebpush==1.14.1
+sentry-sdk==2.20.0
 
 # dev / test
 pytest==8.3.4

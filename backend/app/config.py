@@ -84,6 +84,15 @@ class Settings(BaseSettings):
             )
         return problems
 
+    # --- Observability ---
+    # Error tracking via Sentry — only initialised when a DSN is set (the SDK is
+    # imported lazily, so it stays dormant and dependency-free otherwise).
+    sentry_dsn: str = ""
+    sentry_traces_sample_rate: float = 0.0  # perf tracing off by default (cost)
+    # Structured (JSON) app logs so a collector can index by field.
+    log_json: bool = True
+    log_level: str = "INFO"
+
     # --- Rate limiting ---
     # DB-backed fixed-window limiter on sensitive endpoints. Disabled in tests.
     rate_limit_enabled: bool = True
